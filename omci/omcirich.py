@@ -25,6 +25,7 @@ def render_check_table(check_result):
         header_style="bold magenta",
         box=box.HORIZONTALS,
         padding=(0, 2),
+        min_width=120,
         collapse_padding=True,
     )
 
