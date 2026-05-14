@@ -102,7 +102,7 @@ def test_cmd_check_summary():
         f"Actual output: {result.stdout.strip()}"
     )
 
-    pattern = r"\[TID_DUPLOCATE\]\s+ONT2-G"
+    pattern = r"\[TID_DUPLICATE\]\s+ONT2-G"
 
     assert re.search(pattern, result.stdout), (
         f"\n[Fail] should detect duplicate transaction ID\n"

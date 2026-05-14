@@ -71,7 +71,7 @@ def run_omcicheck(pcap_path, only_vendor=False, only_failed=False, rtt_threshold
         # rtt
         if omci_pkt.is_request:
             if omci_pkt.transaction_id in request_timestamps:
-                status = "[TID_DUPLOCATE]"
+                status = "[TID_DUPLICATE]"
                 count_duplicate += 1
                 is_duplicate = True
             request_timestamps[omci_pkt.transaction_id] = raw_pkt.time
