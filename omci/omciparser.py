@@ -126,6 +126,70 @@ def get_mib_snapshot(pcap_path):
     return snapshot
 
 
+def get_mib_db_data(pcap_path, only_upload=False, class_ids=None):
+    """
+    Extracts and filters a structured Semantic IR of the MIB database from a PCAP.
+
+    This function serves as the core data provider for the 'mibdb' command,
+    transforming raw MIB entries into a clean, hierarchical dictionary
+    suitable for JSON export or professional table rendering.
+
+    Args:
+        pcap_path (str): Path to the target Wireshark PCAP file.
+        only_upload (bool): If True, only parses the MIB Upload sequence to
+            represent the ONU's baseline state (Snapshot). If False,
+            incorporates subsequent Set/Create operations to reflect
+            the current live state.
+        class_ids (list[int], optional): A list of OMCI Class IDs to filter the
+            output (e.g., [84, 171] for VLAN-related entities).
+            Returns all classes if None.
+
+    Returns:
+        dict: A semantic representation of the MIB database.
+            Format:
+            {
+                class_id: {
+                    "me_name": str,
+                    "instances": {
+                        inst_id: { attribute_name: semantic_value, ... }
+                    }
+                }
+            }
+    """
+    # Initialize the MIB database by parsing the PCAP
+    if only_upload:
+        # get_mib_snapshot focuses on the initial provisioning baseline
+        mib_db = get_mib_snapshot(pcap_path)
+    else:
+        # get_all_mib_db tracks the lifecycle of MEs throughout the trace
+        mib_db = get_all_mib_db(pcap_path)
+
+    mib_data = {}
+
+    # Iterate through the parsed MIB entries (Key is a tuple of (class_id, inst_id))
+    for (cid, iid), inst in mib_db.items():
+        # Apply Class ID filtering for Semantic Reduction
+        if class_ids and cid not in class_ids:
+            continue
+
+        me_name = omcimib.get_me_name(cid)
+
+        if cid not in mib_data:
+            mib_data[cid] = {"me_name": me_name, "instances": {}}
+
+        # Convert raw attribute values into semantic strings (e.g., Hex for integers)
+        # This ensures the data is deterministic and ready for AI/JSON reasoning.
+        attrs = {}
+        for k, v in inst.attributes.items():
+            text = inst.attr_semantic(k)
+            raw_val = f"0x{v:x}" if isinstance(v, int) else v
+            attrs[k] = {"val": raw_val, "text": text}
+
+        mib_data[cid]["instances"][iid] = attrs
+
+    return mib_data
+
+
 def get_check_results(
     pcap_path, only_vendor=False, only_failed=False, rtt_threshold=1000
 ):
@@ -318,12 +382,8 @@ def get_vlan_data(mib_db):
                 "inst_id": vlan.inst_id,
                 "rules": rules,
                 "assoc_ptr": attrs.get("Associated ME pointer", "N/A"),
-                "assoc_type": omcimib.ME_171_ASSOCIATION_TYPE.get(
-                    attrs.get("Association type", -1), "Unknown"
-                ),
-                "ds_mode": omcimib.ME_171_DOWNSTREAM_MODE.get(
-                    attrs.get("Downstream mode", 0), "Unknown"
-                ),
+                "assoc_type": vlan.attr_semantic("Association type"),
+                "ds_mode": vlan.attr_semantic("Downstream mode"),
             }
         )
 

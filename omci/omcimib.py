@@ -6,6 +6,7 @@
 
 import struct
 from enum import IntEnum
+from omci.omcisemantic import OMCI_Semantic
 
 
 class OMCIClass(IntEnum):
@@ -1762,50 +1763,6 @@ ME_SPEC = {
     ),
 }
 
-ME_47_TP_TYPE = {
-    1: "Physical path termination point Ethernet UNI",
-    2: "Interworking virtual circuit connection (VCC) termination point",
-    3: "IEEE 802.1p mapper service profile",
-    4: "IP host config data or IPv6 host config data",
-    5: "GEM interworking termination point",
-    6: "Multicast GEM interworking termination point",
-    7: "Physical path termination point xDSL UNI part 1",
-    8: "Physical path termination point VDSL UNI",
-    9: "Ethernet flow termination point",
-    10: "Reserved",
-    11: "Virtual Ethernet interface point",
-    13: "Ethernet in the first mile (EFM) bonding group",
-    12: "Physical path termination point MoCA UNI",
-}
-
-ME_171_ASSOCIATION_TYPE = {
-    0: "MAC bridge port configuration data",
-    1: "IEEE 802.1p mapper service profile",
-    2: "Physical path termination point Ethernet UNI",
-    3: "IP host config data or IPv6 host config data",
-    4: "Physical path termination point xDSL UNI",
-    5: "GEM IW termination point",
-    6: "Multicast GEM IW termination point",
-    7: "Physical path termination point MoCA UNI",
-    8: "Reserved",
-    9: "Ethernet flow termination point",
-    10: "Virtual Ethernet interface point",
-    11: "MPLS pseudowire termination point",
-    12: "EFM bonding group",
-}
-
-ME_171_DOWNSTREAM_MODE = {
-    0: "Inverse (ONU Std)",
-    1: "Transparent (No Change)",
-    2: "Match VID+P -> Inverse (Else: Fwd)",
-    3: "Match VID -> Inverse (Else: Fwd)",
-    4: "Match Pbit -> Inverse (Else: Fwd)",
-    5: "Match VID+P -> Inverse (Else: Drop)",
-    6: "Match VID -> Inverse (Else: Drop)",
-    7: "Match Pbit -> Inverse (Else: Drop)",
-    8: "Block All",
-}
-
 
 def get_me_name(class_id):
     if class_id in ME_CLASS_NAMES:
@@ -1839,7 +1796,6 @@ class MIBInstance:
             self.vendor_data = []  # format [(mask, hex_data)]
 
     def update(self, mask, data):
-
         # unknown MEs
         if self.is_unknown:
             self.vendor_data.append((mask, data.hex().upper()))
@@ -1886,6 +1842,27 @@ class MIBInstance:
             if sbc:
                 mask |= 0x8000 >> i
         self.update(mask, raw_content)
+
+    def attr_semantic(self, attr_name):
+        """
+        Retrieves the human-readable semantic value for an attribute.
+        Priority: Registered Translator > Hex Formatting or int > Raw String.
+        """
+        val = self.attributes.get(attr_name)
+        if val is None:
+            return "N/A"
+
+        translator = OMCI_Semantic.translator(self.class_id, attr_name)
+        if translator:
+            try:
+                return translator(val)
+            except Exception:
+                pass
+
+        if isinstance(val, int):
+            return f"0x{val:x}"
+
+        return str(val)
 
 
 # vim: set ts=4 sw=4 et:

@@ -7,6 +7,7 @@
 
 from rich.text import Text
 
+
 class VlanTaggingOperation:
     def __init__(self, hex_str: str):
         self.raw_hex = hex_str
@@ -55,15 +56,15 @@ class VlanTaggingOperation:
         """
         d = self.data
         fo_prio = d["f_out_prio"]
-        fo_vid  = d["f_out_vid"]
+        fo_vid = d["f_out_vid"]
         fi_prio = d["f_in_prio"]
-        fi_vid  = d["f_in_vid"]
-        fi_eth  = d["f_eth_type"]
-        t_rem   = d["t_tags_rem"]
+        fi_vid = d["f_in_vid"]
+        fi_eth = d["f_eth_type"]
+        t_rem = d["t_tags_rem"]
         to_prio = d["t_out_prio"]
-        to_vid  = d["t_out_vid"]
+        to_vid = d["t_out_vid"]
         ti_prio = d["t_in_prio"]
-        ti_vid  = d["t_in_vid"]
+        ti_vid = d["t_in_vid"]
 
         fov = self._vid_str(fo_vid)
         fiv = self._vid_str(fi_vid)
@@ -71,8 +72,13 @@ class VlanTaggingOperation:
         action = ""
 
         # --- Upstream: Untagged frames (fo_prio=15, fo_vid=4096, fi_prio=15, fi_vid=4096, fi_eth=0) ---
-        if (fo_prio == 15 and fo_vid == 4096 and
-                fi_prio == 15 and fi_vid == 4096 and fi_eth == 0):
+        if (
+            fo_prio == 15
+            and fo_vid == 4096
+            and fi_prio == 15
+            and fi_vid == 4096
+            and fi_eth == 0
+        ):
             if t_rem == 3:
                 action = "Untagged: Discard"
             elif to_prio == 15 and ti_prio != 15:
@@ -83,8 +89,7 @@ class VlanTaggingOperation:
                 action = f"Untagged: Insert 2 tags  F -> Y({to_vid})-X({ti_vid})-F"
 
         # --- Upstream: Single tagged frames (fo_prio=15, fo_vid=4096, fi_prio=8, fi_eth=0) ---
-        elif (fo_prio == 15 and fo_vid == 4096 and
-                fi_prio == 8 and fi_eth == 0):
+        elif fo_prio == 15 and fo_vid == 4096 and fi_prio == 8 and fi_eth == 0:
             if t_rem == 1:  # remove or modify C-VID
                 if ti_prio != 8 and ti_prio != 15:
                     if to_prio == 15:
@@ -92,7 +97,9 @@ class VlanTaggingOperation:
                     else:
                         action = f"Single: Modify+insert tag  C({fiv})-F -> Y({to_vid})-X({ti_vid})-F"
                 elif ti_prio == 8:
-                    action = f"Single: Modify tag, keep prio  C({fiv})-F -> X({ti_vid})-F"
+                    action = (
+                        f"Single: Modify tag, keep prio  C({fiv})-F -> X({ti_vid})-F"
+                    )
                 elif ti_prio == 15:
                     action = f"Single: Remove tag  C({fiv})-F -> F"
             elif t_rem == 3:
@@ -112,65 +119,50 @@ class VlanTaggingOperation:
         elif fo_prio == 8 and fi_prio == 8 and fi_eth == 0:
             if t_rem == 0:
                 if ti_prio == 8:
-                    action = (f"Double: Insert 2 tags (X,Y), copy prios  "
-                              f"S({fov})-C({fiv})-F -> Y({to_vid})-X({ti_vid})-S({fov})-C({fiv})-F")
+                    action = (
+                        f"Double: Insert 2 tags (X,Y), copy prios  "
+                        f"S({fov})-C({fiv})-F -> Y({to_vid})-X({ti_vid})-S({fov})-C({fiv})-F"
+                    )
                 else:
-                    action = (f"Double: Insert 2 tags (X,Y)  "
-                              f"S({fov})-C({fiv})-F -> Y({to_vid})-X({ti_vid})-S({fov})-C({fiv})-F")
+                    action = (
+                        f"Double: Insert 2 tags (X,Y)  "
+                        f"S({fov})-C({fiv})-F -> Y({to_vid})-X({ti_vid})-S({fov})-C({fiv})-F"
+                    )
             elif t_rem == 1 and to_prio == 15:
                 if ti_prio == 15:
-                    action = f"Double: Remove outer tag  S({fov})-C({fiv})-F -> C({fiv})-F"
+                    action = (
+                        f"Double: Remove outer tag  S({fov})-C({fiv})-F -> C({fiv})-F"
+                    )
                 elif ti_prio == 9:
-                    action = (f"Double: Modify outer tag, keep prio  "
-                              f"S({fov})-C({fiv})-F -> X({ti_vid})-C({fiv})-F")
+                    action = (
+                        f"Double: Modify outer tag, keep prio  "
+                        f"S({fov})-C({fiv})-F -> X({ti_vid})-C({fiv})-F"
+                    )
                 else:
                     action = f"Double: Modify outer tag  S({fov})-C({fiv})-F -> X({ti_vid})-C({fiv})-F"
             elif t_rem == 2:
                 if ti_prio == 15 and to_prio == 15:
                     action = f"Double: Remove both tags  S({fov})-C({fiv})-F -> F"
                 elif to_prio == 9:
-                    action = (f"Double: Modify both tags, keep prios  "
-                              f"S({fov})-C({fiv})-F -> Y({to_vid})-X({ti_vid})-F")
+                    action = (
+                        f"Double: Modify both tags, keep prios  "
+                        f"S({fov})-C({fiv})-F -> Y({to_vid})-X({ti_vid})-F"
+                    )
                 else:
                     action = f"Double: Modify both tags  S({fov})-C({fiv})-F -> Y({to_vid})-X({ti_vid})-F"
 
         # --- Single tagged: Default case ---
-        elif (fo_prio == 15 and fo_vid == 4096 and
-                fi_prio == 14 and fi_vid == 4096):
+        elif fo_prio == 15 and fo_vid == 4096 and fi_prio == 14 and fi_vid == 4096:
             if to_prio == 15 and ti_prio == 15 and t_rem == 3:
                 action = "Single Default: Discard"
             elif to_prio == 15 and ti_prio == 15 and t_rem == 0:
                 action = "Single Default: do nothing"
 
         # --- Double tagged: Default case ---
-        elif (fo_prio == 14 and fo_vid == 4096 and
-                fi_prio == 14 and fi_vid == 4096):
+        elif fo_prio == 14 and fo_vid == 4096 and fi_prio == 14 and fi_vid == 4096:
             if to_prio == 15 and ti_prio == 15 and t_rem == 0:
                 action = "Double Default: do nothing"
             elif to_prio == 15 and ti_prio == 15 and t_rem == 3:
                 action = "Double Default: Discard"
 
         self.action_type = action
-
-    def to_rich_text(self):
-        """Detailed Bit-Fields"""
-
-        return Text.assemble(
-            (
-                f"Filter Out: P:{self.data['f_out_prio']:2} V:{self.data['f_out_vid']:4} T:{self.data['f_out_tpid']}\n",
-                "cyan",
-            ),
-            (
-                f"Filter In : P:{self.data['f_in_prio']:2} V:{self.data['f_in_vid']:4} T:{self.data['f_in_tpid']}\n",
-                "cyan",
-            ),
-            (
-                f"Treat Out : P:{self.data['t_out_prio']:2} V:{self.data['t_out_vid']:4} T:{self.data['t_out_tpid']}\n",
-                "yellow",
-            ),
-            (
-                f"Treat In  : P:{self.data['t_in_prio']:2} V:{self.data['t_in_vid']:4} T:{self.data['t_in_tpid']}\n",
-                "yellow",
-            ),
-            (f"Remove Tag: {self.data['t_tags_rem']}", "magenta"),
-        )

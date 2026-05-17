@@ -12,6 +12,42 @@ from rich.text import Text
 from rich.tree import Tree
 
 
+def render_mibdb_table(mib_data):
+    """
+    Renders a professional CLI table for the MIB database using the rich library.
+
+    This function visualizes the Semantic IR of the MIB, providing clear
+    delineation between instances while displaying decoded attribute values.
+    """
+    console = Console()
+    if not mib_data:
+        console.print("[yellow]No MIB entries found with current filters.[/]")
+        return
+
+    table = Table(
+        title="OMCI MIB Database Snapshot",
+        box=box.HORIZONTALS,
+        show_lines=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Class ID", justify="right", style="cyan")
+    table.add_column("ME Name", style="green")
+    table.add_column("Inst ID", justify="right", style="blue")
+    table.add_column("Attributes (Semantic View)", style="white", overflow="fold")
+
+    for cid in sorted(mib_data.keys()):
+        me_info = mib_data[cid]
+        for iid in sorted(me_info["instances"].keys()):
+            attrs = me_info["instances"][iid]
+            attr_display = "\n".join(
+                [f"[dim]{k}[/]: {v['text']}" for k, v in attrs.items()]
+            )
+
+            table.add_row(str(cid), me_info["me_name"], str(iid), attr_display)
+
+    console.print(table)
+
+
 def render_check_table(check_result):
     """
     Renders the OMCI packet consistency check results in a formatted table.

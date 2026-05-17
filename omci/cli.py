@@ -13,6 +13,27 @@ import argparse
 import json
 
 
+def run_mibdb(pcap, only_upload=False, class_id_str=None, json_output=False):
+    class_ids = None
+    if class_id_str:
+        try:
+            class_ids = [int(c.strip()) for c in class_id_str.split(",")]
+        except ValueError:
+            print(
+                "[!] Error: Class ID must be numbers separated by commas (e.g. 84,171)"
+            )
+            return
+
+    mib_data = omciparser.get_mib_db_data(pcap, only_upload, class_ids)
+
+    if json_output:
+        print(json.dumps(mib_data, indent=2))
+    else:
+        from .omcirich import render_mibdb_table
+
+        render_mibdb_table(mib_data)
+
+
 def run_omcicheck(
     pcap_path,
     only_vendor=False,
@@ -108,6 +129,17 @@ def main():
     subparsers = parser.add_subparsers(
         dest="command", help="Available analysis commands"
     )
+    # --- Sub-command: mibdb ---
+    mibdb_p = subparsers.add_parser(
+        "mibdb", parents=[common_args], help="Dump MIB database"
+    )
+    mibdb_p.add_argument("pcap", help="Path to pcap file")
+    mibdb_p.add_argument("--only-upload", action="store_true")
+    mibdb_p.add_argument(
+        "--class-id",
+        help="Filter by ME class IDs (comma-separated, e.g., 84,171)",
+        type=str,
+    )
 
     # --- Sub-command: check ---
     check_p = subparsers.add_parser(
@@ -136,7 +168,7 @@ def main():
 
     # --- Sub-command: vlan_tbl ---
     vlan_p = subparsers.add_parser(
-        "vlan_tbl",
+        "vlan-tbl",
         parents=[common_args],
         help="Analye OMCI VLAN tagging logic (Table-driven)",
     )
@@ -144,7 +176,7 @@ def main():
 
     # --- Sub-command: tcont_flow ---
     tcont_p = subparsers.add_parser(
-        "tcont_flow",
+        "tcont-flow",
         parents=[common_args],
         help="Trace T-CONT -> GEM -> PQ traffic hierarchy",
     )
@@ -152,7 +184,11 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "check":
+    if args.command == "mibdb":
+        run_mibdb(
+            args.pcap, args.only_upload, args.class_id, json_output=args.json_output
+        )
+    elif args.command == "check":
         run_omcicheck(
             args.pcap,
             args.only_vendor,
@@ -166,9 +202,9 @@ def main():
         run_omcidiff(args.pcap1, args.pcap2, json_output=args.json_output)
     elif args.command == "graphic":
         run_omcigraph(args.pcap)
-    elif args.command == "vlan_tbl":
+    elif args.command == "vlan-tbl":
         run_omcivlan(args.pcap, json_output=args.json_output)
-    elif args.command == "tcont_flow":
+    elif args.command == "tcont-flow":
         run_tcont_flow(args.pcap, json_output=args.json_output)
     else:
         parser.print_help()

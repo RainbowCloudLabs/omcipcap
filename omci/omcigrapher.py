@@ -6,7 +6,7 @@
 
 import json
 from omci.omcimib import OMCIClass
-from omci.omcimib import ME_171_ASSOCIATION_TYPE, ME_47_TP_TYPE
+from omci.omcisemantic import ME_171_ASSOCIATION_TYPE, ME_47_TP_TYPE
 
 INTERESTED_CLASSES = {
     OMCIClass.PPTP_ETHERNET_UNI,  # 11

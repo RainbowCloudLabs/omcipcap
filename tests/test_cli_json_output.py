@@ -167,7 +167,7 @@ def test_cmd_vlan_json_output():
     result = subprocess.run(
         [
             "omcipcap",
-            "vlan_tbl",
+            "vlan-tbl",
             "--json-output",
             "single_unit_1_tont_2_gem.pcap",
         ],
@@ -305,7 +305,7 @@ def test_cmd_tcont_flow_json_output():
     result = subprocess.run(
         [
             "omcipcap",
-            "tcont_flow",
+            "tcont-flow",
             "--json-output",
             "single_unit_1_tont_2_gem.pcap",
         ],

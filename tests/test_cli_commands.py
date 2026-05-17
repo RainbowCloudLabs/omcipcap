@@ -16,7 +16,7 @@ def setup_test_files():
     subprocess.run(["python3", "utils/generate_omcicheck_example.py"], check=True)
     # for omcipcap diff
     subprocess.run(["python3", "utils/generate_omcidiff_example.py"], check=True)
-    # for omcipcap graphic, vlan_tbl and tcont_flow
+    # for omcipcap graphic, vlan-tbl and tcont-flow
     subprocess.run(["python3", "utils/generate_dual_gem_shared_tcont.py"], check=True)
 
     yield
@@ -389,7 +389,7 @@ def test_cmd_vlan_tbl():
     pcap_file = "single_unit_1_tont_2_gem.pcap"
 
     result = subprocess.run(
-        ["omcipcap", "vlan_tbl", pcap_file], capture_output=True, text=True, check=True
+        ["omcipcap", "vlan-tbl", pcap_file], capture_output=True, text=True, check=True
     )
 
     pattern = r"Single:.*Modify.*tag.*C\(100\)-F.*X\(100\)-F"
@@ -414,7 +414,7 @@ def test_cmd_tcont_flow():
     pcap_file = "single_unit_1_tont_2_gem.pcap"
 
     result = subprocess.run(
-        ["omcipcap", "tcont_flow", pcap_file],
+        ["omcipcap", "tcont-flow", pcap_file],
         capture_output=True,
         text=True,
         check=True,
