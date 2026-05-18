@@ -10,6 +10,7 @@ from omci import omcimib
 from omci import omcigrapher
 from omci import omciparser
 from omci import omcisemantic
+from omci import omcirich
 import argparse
 import json
 
@@ -30,9 +31,7 @@ def run_mibdb(pcap, only_upload=False, class_id_str=None, json_output=False):
     if json_output:
         print(json.dumps(mib_data, indent=2))
     else:
-        from .omcirich import render_mibdb_table
-
-        render_mibdb_table(mib_data)
+        omcirich.render_mibdb_table(mib_data)
 
 
 def run_omcicheck(
@@ -50,9 +49,7 @@ def run_omcicheck(
     if json_output:
         print(json.dumps(check_result, indent=2))
     else:
-        from .omcirich import render_check_table
-
-        render_check_table(check_result)
+        omcirich.render_check_table(check_result)
 
 
 def run_omcidiff(pcap1, pcap2, full_diff=False, class_id_str=None, json_output=False):
@@ -83,9 +80,7 @@ def run_omcidiff(pcap1, pcap2, full_diff=False, class_id_str=None, json_output=F
     if json_output:
         print(json.dumps(diff_data, indent=2))
     else:
-        from .omcirich import render_diff_table
-
-        render_diff_table(diff_data)
+        omcirich.render_diff_table(diff_data)
 
 
 def run_omcitopo(pcap, output_html=None, json_output=False):
@@ -112,9 +107,7 @@ def run_omcivlan(pcap, json_output=False):
     if json_output:
         print(json.dumps(vlan_data, indent=2))
     else:
-        from .omcirich import render_vlan_table
-
-        render_vlan_table(vlan_data)
+        omcirich.render_vlan_table(vlan_data)
 
 
 def run_tcont_flow(pcap, json_output=False):
@@ -124,9 +117,7 @@ def run_tcont_flow(pcap, json_output=False):
     if json_output:
         print(json.dumps(flow_data, indent=2))
     else:
-        from .omcirich import render_tcont_flow_tree
-
-        render_tcont_flow_tree(flow_data)
+        omcirich.render_tcont_flow_tree(flow_data)
 
 
 def load_mib_json(json_path):
