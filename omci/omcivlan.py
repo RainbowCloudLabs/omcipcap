@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2026 Dong Yuan, Shih daneshih1125@gmail.com
+# Copyright (c) 2026 Dong-Yuan Shih <daneshih1125@gmail.com>
 # Licensed under the MIT License.
 #
-
-from rich.text import Text
 
 
 class VlanTaggingOperation:
