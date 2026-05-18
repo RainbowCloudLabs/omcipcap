@@ -431,7 +431,8 @@ def test_cmd_mibdb_diff_json_output():
 
     ip_host_mod = next(c for c in changes if c["class_id"] == 134)
     assert ip_host_mod["attr_name"] == "MAC address"
-    assert ip_host_mod["new"] == "C0A8010A0000"
+    assert ip_host_mod["old"] == "00:00:00:00:00:00"
+    assert ip_host_mod["new"] == "C0:A8:01:0A:00:00"
 
     tcont_add = next(c for c in changes if c["class_id"] == 262)
     assert tcont_add["status"] == "added"

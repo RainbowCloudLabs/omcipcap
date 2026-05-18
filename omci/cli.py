@@ -184,6 +184,7 @@ def main():
     # --- Sub-command: diff ---
     diff_p = subparsers.add_parser(
         "mibdb-diff",
+        aliases=["diff"],
         parents=[common_args],
         help="Compare MIB snapshots between two pcaps (only compare MIB upload MIBs by default)",
     )
@@ -247,7 +248,7 @@ def main():
         run_mibdb(
             args.pcap, args.only_upload, args.class_id, json_output=args.json_output
         )
-    elif args.command == "mibdb-diff":
+    elif args.command in ["mibdb-diff", "diff"]:
         if args.mib_json:
             load_mib_json(args.mib_json)
         run_omcidiff(

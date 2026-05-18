@@ -27,7 +27,7 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 |---|---|---|
 | `check` | Analyze RTT, TID duplicates, and ME failures | Table / JSON |
 | `mibdb` | Dump the Semantic MIB Database | Table / JSON |
-| `mibdb-diff` | Compare two MIBs with semantic decoding | Table / JSON |
+| `mibdb-diff (diff)` | Compare two MIBs with semantic decoding | Table / JSON |
 | `vlan-tbl` | Analyze OMCI VLAN tagging logic (Table-driven) | Table / JSON |
 | `tcont-flow` | Trace T-CONT → GEM → PQ traffic hierarchy | Table / JSON |
 | `topology (graphic)` | Generate interactive topology HTML | Interactive HTML / JSON |
@@ -115,7 +115,7 @@ omcipcap mibdb --only-upload examples/omci.pcap
 omcipcap mibdb-diff mib_vendor_v1.pcap mib_vendor_v2.pcap
 omcipcap mibdb-diff mib_vendor_v1.pcap mib_vendor_v2.pcap --mib-json examples/vendor_355.json
 omcipcap mibdb-diff --full ont1.pcap ont2.pcap
-omcipcap mibdb-diff --full --class-id=84,171 ont1.pcap ont2.pcap
+omcipcap diff --full --class-id=84,171 ont1.pcap ont2.pcap
 ```
 
 Example Output

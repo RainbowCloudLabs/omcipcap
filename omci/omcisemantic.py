@@ -4,6 +4,9 @@
 # Copyright (c) 2026 Dong-Yuan Shih daneshih1125@gmail.com
 # Licensed under the MIT License.
 
+import struct
+import socket
+
 
 class OMCISemantic:
     """
@@ -157,7 +160,71 @@ def get_attr_semantic(class_id, attr_name, value):
     return str(value)
 
 
+def trans_ipv4_address(value):
+    """
+    Translate a 4-byte value into a standard IPv4 dotted-decimal string.
+
+    Args:
+        value: Can be an integer, 4-byte hex string, or bytes.
+
+    Returns:
+        str: Human-readable IPv4 address (e.g., '192.168.1.10').
+    """
+    if value is None:
+        return "0.0.0.0"
+
+    try:
+        # If the value is a hex string (e.g., "C0A8010A")
+        if isinstance(value, str):
+            # Remove 0x prefix if exists and convert to bytes
+            clean_hex = value.replace("0x", "")
+            # Ensure it's 8 characters for 4 bytes
+            raw_bytes = bytes.fromhex(clean_hex.ljust(8, "0")[:8])
+        # If the value is already an integer (u32)
+        elif isinstance(value, int):
+            raw_bytes = struct.pack(">I", value)
+        # If it's already bytes
+        elif isinstance(value, bytes):
+            raw_bytes = value[:4]
+        else:
+            return str(value)
+
+        # Convert bytes to dotted-decimal format
+        return socket.inet_ntoa(raw_bytes)
+    except Exception:
+        return str(value)
+
+
+def trans_mac_address(value):
+    """
+    Format 6-byte hex value to standard MAC address format (xx:xx:xx:xx:xx:xx).
+    """
+    if not value or value == "000000000000":
+        return "00:00:00:00:00:00"
+
+    # Remove prefix and format
+    s = str(value).replace("0x", "")
+    return ":".join(s[i : i + 2] for i in range(0, 12, 2))
+
+
 OMCISemantic.register(47, "TP type", me47_tp_type_translator)
 OMCISemantic.register(171, "Association type", me171_assoc_type_translator)
 OMCISemantic.register(171, "Downstream mode", me171_downstream_mode_translator)
 OMCISemantic.register(84, "VLAN filter list", decode_me84_vlan_filter_list)
+# Mac
+OMCISemantic.register(134, "MAC address", trans_mac_address)
+# IPv4 Address
+ipv4_fields = [
+    "IP address",
+    "Mask",
+    "Gateway",
+    "Primary DNS",
+    "Secondary DNS",
+    "Current address",
+    "Current mask",
+    "Current gateway",
+    "Current primary DNS",
+    "Current Secondary DNS",
+]
+for field in ipv4_fields:
+    OMCISemantic.register(134, field, trans_ipv4_address)
