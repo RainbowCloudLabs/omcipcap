@@ -48,13 +48,23 @@ class OmciResult(IntEnum):
 
 
 class OMCIPacket:
-    __slots__ = ('transaction_id', 'message_type', 'device_id', 'ak', 'action', 'me_class', 'inst_id')
+    __slots__ = (
+        "transaction_id",
+        "message_type",
+        "device_id",
+        "ak",
+        "ar",
+        "action",
+        "me_class",
+        "inst_id",
+    )
 
     def __init__(self, data):
         self.transaction_id = int.from_bytes(data[0:2], 'big')
         self.message_type = data[2]
         self.device_id = data[3]
         self.ak = bool(self.message_type & 0x20)
+        self.ar = bool(self.message_type & 0x40)
         self.me_class = int.from_bytes(data[4:6], 'big')
         self.inst_id = int.from_bytes(data[6:8], 'big')
 
@@ -112,8 +122,7 @@ class OMCIPacket:
 
     @property
     def is_request(self):
-        if self.is_response:
-            return False
+        return self.ar
 
         no_result_actions = {
             OmciAction.MIB_UPLOAD,
