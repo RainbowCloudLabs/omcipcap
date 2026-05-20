@@ -5,6 +5,8 @@ __pycache__/
 *.pyc
 build/
 dist/
+tools/*.pdf
+tools/*.db
 *.egg-info/
 [._]*.s[a-v][a-z]
 [._]*.sw[a-p]
