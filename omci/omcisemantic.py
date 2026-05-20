@@ -248,7 +248,7 @@ ipv4_fields = [
     "Current mask",
     "Current gateway",
     "Current primary DNS",
-    "Current Secondary DNS",
+    "Current secondary DNS",
 ]
 for field in ipv4_fields:
     OMCISemantic.register(134, field, trans_ipv4_address)

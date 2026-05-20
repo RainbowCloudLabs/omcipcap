@@ -41,6 +41,7 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 ├── LICENSE         # MIT License
 ├── README.md       # Project documentation
 ├── examples        # pcap and json samples
+├── extensions      # semantic extensions
 ├── omci            # Core package
 ├── pyproject.toml  # Build system & entry points
 ├── tests           # Test suites
@@ -78,7 +79,10 @@ chmod +x omcipcap_linux
 ### omcipcap check
 Analyze a pcap file to display a summary of all OMCI packets:
 ```
-omcipcap check examples/omcicheck_example.pcap
+# print all vendor, failed, late and duplicates packets
+omcipcap check omcicheck_example.pcap
+# get JSON output of OMCI resp failed
+omcipcap check --only-failed -j omcicheck_example.pcap
 ```
 ![omcicheck](https://github.com/daneshih1125/omcipcap/blob/master/examples/omcicheck_example.png)
 
@@ -104,18 +108,25 @@ MIB Database Dump
 Dump all or filtered MIB instances from a pcap.
 
 ```bash
+# print all MIB infomation
 omcipcap mibdb examples/omci.pcap
+# print all MIB for class 84 and 171
 omcipcap mibdb --class-id 84,171 examples/omci.pcap
-omcipcap mibdb --only-upload examples/omci.pcap
+# print JSON of MIB snapshots (MIB uploads)
+omcipcap mibdb -j --only-upload examples/omci.pcap
 ```
 
 ### omcipcap mibdb-diff
  Analyze two pcap files to identify differences in MIB provisioning
 ```bash
+# Compare MIB snapshots between two pcaps, only compare MIB upload MIBs by default
 omcipcap mibdb-diff mib_vendor_v1.pcap mib_vendor_v2.pcap
+# Compare MIB snapshots between two pcaps with user defined MIB
 omcipcap mibdb-diff mib_vendor_v1.pcap mib_vendor_v2.pcap --mib-json examples/vendor_355.json
+# Compare Full provision MIB between two pcaps
 omcipcap mibdb-diff --full ont1.pcap ont2.pcap
-omcipcap diff --full --class-id=84,171 ont1.pcap ont2.pcap
+# Compare full MIB provisioning between two PCAPs for Class 84 and 171, and output JSON
+omcipcap diff -j --full --class-id=84,171 ont1.pcap ont2.pcap
 ```
 
 Example Output
@@ -151,7 +162,7 @@ omcipcap topology omci.pcap -o example.html
 
 ### omcipcap vlan-tbl
 ```
-omcipcap vlan_tbl omci.pcap
+omcipcap vlan-tbl omci.pcap
 ```
 List All ME 171 instances and detail of VLAN table
 ![omcivlan](https://github.com/daneshih1125/omcipcap/blob/master/examples/omcivlan.png)
