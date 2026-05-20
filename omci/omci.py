@@ -56,6 +56,7 @@ class OMCIPacket:
         "message_type",
         "device_id",
         "ak",
+        "ar",
         "action",
         "me_class",
         "inst_id",
@@ -73,6 +74,7 @@ class OMCIPacket:
         self.message_type = data[2]
         self.device_id = data[3]
         self.ak = bool(self.message_type & 0x20)
+        self.ar = bool(self.message_type & 0x40)
         self.me_class = int.from_bytes(data[4:6], "big")
         self.inst_id = int.from_bytes(data[6:8], "big")
 
@@ -93,10 +95,6 @@ class OMCIPacket:
             if len(data) < 14:
                 raise ValueError("Data too short")
             return OMCIExtended(data)
-
-    @property
-    def is_response(self):
-        return self.ak
 
     @property
     def is_vendor_me(self):
@@ -129,8 +127,26 @@ class OMCIPacket:
         return cls(full_raw)
 
     @property
+    def is_response(self):
+        """
+        Response message with AK bit set.
+        """
+        return self.ak
+
+    @property
     def is_request(self):
-        return not self.is_response
+        """
+        Acknowledge Request (OLT initiated that expects a response)
+        """
+        return self.ar
+
+    @property
+    def is_notification(self):
+        """
+        ONU initiated autonomous messages (Alarm / AVC) that do NOT expect response.
+        MT bit 6 (AR) == 0 and bit 5 (AK) == 0
+        """
+        return not self.ar and not self.ak
 
     @property
     def has_result_code(self):

@@ -44,7 +44,7 @@ def test_cmd_check_json_output():
             "omcipcap",
             "check",
             "--json-output",
-            "examples/omcicheck_example.pcap",
+            "omcicheck_example.pcap",
         ],
         capture_output=True,
         text=True,
