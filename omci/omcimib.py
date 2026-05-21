@@ -1764,6 +1764,21 @@ ME_SPEC = {
 }
 
 
+SENSITIVE_ME_CLASSES = {
+    OMCIClass.SOFTWARE_IMAGE,
+    OMCIClass.NETWORK_ADDRESS,
+    OMCIClass.VOIP_CONFIG_DATA,
+    OMCIClass.VOIP_MEDIA_PROFILE,
+    OMCIClass.AUTHENTICATION_SECURITY_METHOD,
+    OMCIClass.LARGE_STRING,
+    OMCIClass.SIP_AGENT_CONFIG_DATA,
+    OMCIClass.SIP_USER_DATA,
+    OMCIClass.TR_069_MANAGEMENT_SERVER,
+}
+
+SENSITIVE_ME_ATTRIBUTES = {"password", "secret"}
+
+
 def get_me_name(class_id):
     if class_id in ME_CLASS_NAMES:
         return ME_CLASS_NAMES[class_id]

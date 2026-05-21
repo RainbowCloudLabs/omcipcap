@@ -11,6 +11,7 @@ from omci import omciflow
 from omci import omcivlan
 from omci.omci import OMCIBaseline, OMCIPacket, OmciAction, OmciResult
 from omci.omcimib import OMCIClass
+from omci.omcimib import SENSITIVE_ME_CLASSES, SENSITIVE_ME_ATTRIBUTES
 
 
 def get_omci_pkts(pcap_path, include_raw=False):
@@ -181,10 +182,18 @@ def get_mib_db_data(pcap_path, only_upload=False, class_ids=None):
         # Convert raw attribute values into semantic strings (e.g., Hex for integers)
         # This ensures the data is deterministic and ready for AI/JSON reasoning.
         attrs = {}
+        is_sensitive_class = cid in SENSITIVE_ME_CLASSES
         for k, v in inst.attributes.items():
-            text = inst.attr_semantic(k)
-            raw_val = f"0x{v:x}" if isinstance(v, int) else v
-            attrs[k] = {"val": raw_val, "text": text}
+            k_lower = k.lower()
+            is_sensitive_attr = any(
+                keyword in k_lower for keyword in SENSITIVE_ME_ATTRIBUTES
+            )
+            if is_sensitive_class or is_sensitive_attr:
+                attrs[k] = {"val": "*****", "text": "*****"}
+            else:
+                text = inst.attr_semantic(k)
+                raw_val = f"0x{v:x}" if isinstance(v, int) else v
+                attrs[k] = {"val": raw_val, "text": text}
 
         mib_data[cid]["instances"][iid] = attrs
 

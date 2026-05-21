@@ -194,6 +194,12 @@ Each T-CONT entry shows:
 - **[US] PQ**: Upstream Priority Queue with CIR/PIR bandwidth limits.
 - **[DS] PQ**: Downstream Priority Queue with scheduling priority.
 
+## Disclaimer
+this software is for educational and network debugging purposes only. The author (daneshih1125) provides this software "as is" without warranty of any kind. 
+
+- The users are solely responsible for ensuring that they have the legal right and proper authorization to capture, process, and analyze any network packets (pcap/log) used with this tool.
+- The author shall not be held liable for any data breaches, compliance violations (such as GDPR, PDPA), leakage of trade secrets, or security incidents caused by the users processing sensitive or production network data with this tool or exporting data to third-party AI models.
+
 ## License & Copyright
 **Copyright (c) 2026 Dong-Yuan Shih <daneshih1125@gmail.com>
 Licensed under the MIT License.**
