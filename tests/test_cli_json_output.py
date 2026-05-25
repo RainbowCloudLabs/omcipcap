@@ -74,8 +74,12 @@ def test_cmd_check_json_output():
     #
     assert summary["resp_fail_count"] == 2, "Should detect 2 OMCI response failures"
 
-    assert summary["is_vendor_me_count"] == 5, (
-        "Should detect 5 vendor/future ME packets"
+    assert summary["onu_upload_vendor_me_count"] == 3, (
+        "Should detect 3 ONU upload vendor/future ME packets"
+    )
+
+    assert summary["olt_provision_vendor_me_count"] == 2, (
+        "Should detect 2 OLT provision vendor/future ME packets"
     )
 
     assert summary["resp_late_count"] == 1, "Should detect 1 late OMCI response"

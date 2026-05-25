@@ -110,7 +110,8 @@ def render_check_table(check_result):
     console.print(table)
     console.print(
         f"[bold]Summary:[/bold] Found [red]{summary['resp_fail_count']}[/red] failures, "
-        f"{summary['is_vendor_me_count']} Vendor packets, "
+        f"{summary['onu_upload_vendor_me_count']} ONU Vendor packets, "
+        f"{summary['olt_provision_vendor_me_count']} OLT Vendor packets, "
         f"{summary['transaction_id_duplicate_count']} duplicate packets, "
         f"{summary['resp_late_count']} late packets\n"
     )

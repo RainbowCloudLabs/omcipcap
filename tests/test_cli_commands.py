@@ -49,7 +49,7 @@ def test_cmd_check_summary():
     )
 
     expected_summary = (
-        "Summary: Found 2 failures, 5 Vendor packets, "
+        "Summary: Found 2 failures, 3 ONU Vendor packets, 2 OLT Vendor packets, "
         "1 duplicate packets, 1 late packets"
     )
 

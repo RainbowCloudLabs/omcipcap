@@ -225,7 +225,8 @@ def get_check_results(
                          vendor MEs, and duplicate TIDs.
     """
     count_fail = 0
-    count_vendor = 0
+    count_olt_vendor = 0
+    count_onu_vendor = 0
     count_duplicate = 0
     count_late = 0
     request_timestamps = {}
@@ -289,14 +290,13 @@ def get_check_results(
                     count_late += 1
                     status = "[LATE]"
 
-        if (
-            omci_pkt.is_vendor_me
-            or omci_pkt.is_feature_me
-            or omci_pkt.mib_upload_is_vendor
-            or omci_pkt.mib_upload_is_feature
-        ):
+        if omci_pkt.is_vendor_me or omci_pkt.is_feature_me:
             is_vendor = True
-            count_vendor += 1
+            count_olt_vendor += 1
+
+        if omci_pkt.mib_upload_is_vendor or omci_pkt.mib_upload_is_feature:
+            is_vendor = True
+            count_onu_vendor += 1
 
         if only_vendor and not is_vendor:
             continue
@@ -326,7 +326,8 @@ def get_check_results(
             )
     check_result["summary"] = {
         "resp_fail_count": count_fail,
-        "is_vendor_me_count": count_vendor,
+        "onu_upload_vendor_me_count": count_onu_vendor,
+        "olt_provision_vendor_me_count": count_olt_vendor,
         "resp_late_count": count_late,
         "transaction_id_duplicate_count": count_duplicate,
     }
