@@ -429,8 +429,8 @@ def test_cmd_mibdb_diff_json_output():
         c for c in changes if c["class_id"] == 5 and c["inst_id"] == 257
     )
     assert cardholder_mod["status"] == "modified"
-    assert cardholder_mod["old"] == "0x30"
-    assert cardholder_mod["new"] == "0x31"
+    assert cardholder_mod["old"] == "VEIP"
+    assert cardholder_mod["new"] == "10G GBASE-T Ethernet"
     assert cardholder_mod["attr_name"] == "Actual Plug-in Unit Type"
 
     ip_host_mod = next(c for c in changes if c["class_id"] == 134)

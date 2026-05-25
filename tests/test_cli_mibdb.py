@@ -80,7 +80,7 @@ def test_mibdb_all():
     assert "384" in cardholders
 
     assert cardholders["257"]["Actual Equipment Id"]["text"] == "SFU10G"
-    assert cardholders["384"]["Actual Plug-in Unit Type"]["text"] == "0xee"
+    assert cardholders["384"]["Actual Plug-in Unit Type"]["text"] == "XG-PON10G10"
 
     # check ME 84
     vlan_filter = mibdb_output["84"]["instances"]["2"]
@@ -148,7 +148,7 @@ def test_mibdb_only_upload():
 
     # Check instance 384 plug-in unit type
     assert cardholders["384"]["Actual Plug-in Unit Type"]["val"] == "0xee"
-    assert cardholders["384"]["Actual Plug-in Unit Type"]["text"] == "0xee"
+    assert cardholders["384"]["Actual Plug-in Unit Type"]["text"] == "XG-PON10G10"
 
     # 4. Check ME 6 (Circuit Pack) details
     cp_inst = mibdb_output["6"]["instances"]["257"]

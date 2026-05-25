@@ -98,6 +98,104 @@ ME_171_DOWNSTREAM_MODE = {
     8: "Block All",
 }
 
+G988_PLUGIN_UNIT_TYPES = {
+    0: "No LIM",
+    13: "C1.5 (DS1)",
+    14: "C2.0 (E1)",
+    15: "C6.3 (J2)",
+    16: "C-DS1/E1",
+    17: "C-DS1/E1/J1",
+    22: "10BASE-T",
+    23: "100BASE-T",
+    24: "10/100 BASE-T",
+    28: "C1.5 (J1)",
+    32: "POTS",
+    33: "ISDN-BRI",
+    34: "Gigabit optical Ethernet",
+    35: "xDSL",
+    36: "SHDSL",
+    37: "VDSL",
+    38: "Video service",
+    39: "LCT",
+    40: "802.11",
+    41: "xDSL/POTS",
+    42: "VDSL/POTS",
+    43: "Common equipment",
+    44: "Combined video UNI and PON interface",
+    45: "Mixed services equipment",
+    46: "MoCA",
+    47: "10/100/1000BASE-T",
+    48: "VEIP",
+    49: "10G GBASE-T Ethernet",
+    50: "2.5GBASE-T Ethernet",
+    51: "5GBASE-T Ethernet",
+    52: "25GBASE-T Ethernet",
+    53: "40GBASE-T Ethernet",
+    54: "1000BASE-LX",
+    55: "1000BASE-SX",
+    56: "10GBASE-SR",
+    57: "10GBASE-LX4",
+    58: "10GBASE-LRM",
+    59: "10GBASE-LR",
+    60: "10GBASE-ER",
+    61: "10GBASE-SW",
+    62: "10GBASE-LW",
+    63: "10GBASE-EW",
+    64: "25GBASE-SR",
+    65: "40GBASE-SR4",
+    66: "40GBASE-LR4",
+    67: "40GBASE-ER4",
+    68: "Multi-Rate-10GBASE-T",
+    69: "10G Optical Interface",
+    70: "40G Optical Interface",
+    71: "G.fast",
+    72: "25G Optical Interface",
+    73: "50G Optical Interface",
+    74: "25GBASE-LR",
+    75: "25GBASE-ER",
+    76: "50GBASE-SR",
+    77: "50GBASE-FR",
+    78: "50GBASE-LR",
+    79: "50GBASE-ER",
+    80: "10GBASE-BR10",
+    81: "10GBASE-BR20",
+    82: "10GBASE-BR40",
+    83: "25GBASE-BR10",
+    84: "25GBASE-BR20",
+    85: "25GBASE-BR40",
+    86: "50GBASE-BR10",
+    87: "50GBASE-BR20",
+    88: "50GBASE-BR40",
+    # 89..191: Reserved
+    # 192..223: Vendor-specific
+    # 224..226: Reserved
+    227: "HSP50G50",
+    228: "HSP50G25",
+    229: "HSP50G12",
+    230: "Multi-PON",
+    231: "PtP WDM PON line rate class 1",
+    232: "PtP WDM PON line rate class 2",
+    233: "PtP WDM PON line rate class 3",
+    234: "TWDM10G2",
+    235: "TWDM10G10",
+    236: "TWDM2G2",
+    237: "XG-PON10G2488",
+    238: "XG-PON10G10",
+    239: "Mid-span PON reach extender UNI",
+    240: "Mid-span PON reach extender ANI",
+    241: "Mid-span PON reach extender upstream optical amplifier",
+    242: "Mid-span PON 2488/1244 reach extender downstream optical amplifier",
+    # 243..247: See [ITU-T G.984.4] G-PON interfaces of diverse rates
+    248: "GPON24881244",
+    # 249..254: See [ITU-T G.983.2] and [ITU-T G.984.4] G-PON and B-PON interfaces
+    255: "Plug-and-play/Unknown",
+}
+
+
+def plugin_in_type_translator(val):
+    """Plug-in type translator"""
+    return G988_PLUGIN_UNIT_TYPES.get(val, f"Unknown ({val})")
+
 
 def me47_tp_type_translator(val):
     """ME 47 TP Type translator"""
@@ -252,3 +350,9 @@ ipv4_fields = [
 ]
 for field in ipv4_fields:
     OMCISemantic.register(134, field, trans_ipv4_address)
+# Plug-in Type
+OMCISemantic.register(5, "Actual Plug-in Unit Type", plugin_in_type_translator)
+OMCISemantic.register(5, "Expected Plug-in Unit Type", plugin_in_type_translator)
+OMCISemantic.register(6, "Type", plugin_in_type_translator)
+OMCISemantic.register(11, "Expected Type", plugin_in_type_translator)
+OMCISemantic.register(11, "Sensed Type", plugin_in_type_translator)

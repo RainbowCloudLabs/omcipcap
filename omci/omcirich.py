@@ -243,7 +243,7 @@ def render_diff_table(diff_result, pcap1_name="Pcap 1", pcap2_name="Pcap 2"):
         collapse_padding=True,
     )
 
-    table.add_column("Status", width=10)
+    table.add_column("Status", no_wrap=True, min_width=12)
     table.add_column("ME Name (ID)", style="cyan")
     table.add_column("Inst", justify="right", style="dim")
     table.add_column("Attribute", style="yellow")

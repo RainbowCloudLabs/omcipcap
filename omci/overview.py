@@ -2,6 +2,46 @@ import json
 import sys
 import argparse
 from omci import omciparser
+from omci.omcimib import OMCIClass
+
+
+def get_onu_capability(mib_db):
+    tcont_db = omciparser.get_instances_by_class(mib_db, OMCIClass.T_CONT)
+    tcont_count = len(tcont_db)
+    pq_db = omciparser.get_instances_by_class(mib_db, OMCIClass.PRIORITY_QUEUE_G)
+    pq_count = len(pq_db)
+    pppt_db = omciparser.get_instances_by_class(mib_db, OMCIClass.PPTP_ETHERNET_UNI)
+    pptp_count = len(pppt_db)
+    pots_db = omciparser.get_instances_by_class(mib_db, OMCIClass.PPTP_POTS_UNI)
+    pots_count = len(pots_db)
+    card_db = omciparser.get_instances_by_class(mib_db, OMCIClass.CARDHOLDER)
+
+    pon_type = "PON"
+    for card in card_db:
+        type_int = card.attributes.get("Actual Plug-in Unit Type", 0)
+        if type_int == 248:
+            pon_type = "GPON"
+            break
+        elif type_int == 237:
+            pon_type = "XG-PON (Asymmetric)"
+            break
+        elif type_int == 238:
+            pon_type = "XG-PON (Symmetric 10G/10G)"
+            break
+        elif type_int == 235:
+            pon_type = "XGS-PON"
+            break
+        elif type_int == 230:
+            pon_type = "Multi-PON"
+            break
+
+    return {
+        "pon_type": pon_type,
+        "pptp_count": pptp_count,
+        "pots_count": pots_count,
+        "tcont_count": tcont_count,
+        "priority_queue_count": pq_count,
+    }
 
 
 def generate_pcap_ai_overview(pcap_path):
@@ -17,6 +57,7 @@ def generate_pcap_ai_overview(pcap_path):
         "vlan_operation_data": vlan_data,
         "tcont_flows_data": tcont_flow,
         "topology_data": topo_data,
+        "onu_capability": get_onu_capability(mib_db),
     }
 
     output_file = "overview.json"
