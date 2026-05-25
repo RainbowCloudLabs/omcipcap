@@ -411,6 +411,7 @@ def gen_provisioning_pkts(start_tid=0x100):
                             OMCIClass.VLAN_TAGGING_FILTER_DATA, 3,
                             content=bytes([OmciResult.SUCCESS] + [0]*27), is_from_olt=False))
 
+    tid += 1
     # 8021P all pbit pointer GEM internetwork 2
     pkts.append(create_omci(tid, msg_req(OmciAction.SET), OMCIClass.DOT1P_MAPPER_SERVICE_PROFILE, 2,
                            content=build_std_me_data(OMCIClass.DOT1P_MAPPER_SERVICE_PROFILE, 0x7f80,
