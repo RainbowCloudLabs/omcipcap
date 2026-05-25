@@ -11,6 +11,7 @@ from omci import omcigrapher
 from omci import omciparser
 from omci import omcisemantic
 from omci import omcirich
+from omci.ai_overview import run_ai_overview
 import argparse
 import json
 
@@ -232,6 +233,18 @@ def main():
     )
     tcont_p.add_argument("pcap", help="Path to pcap file")
 
+    # --- Sub-command: ai-overview ---
+    ai_p = subparsers.add_parser(
+        "ai-overview",
+        help="Generate AI-powered diagnostic overview (requires OpenRouter API key)",
+    )
+    ai_p.add_argument(
+        "--model",
+        help="Model to use (default: anthropic/claude-sonnet-4-5)",
+        default="anthropic/claude-sonnet-4-5",
+    )
+    ai_p.add_argument("pcap", help="Path to pcap file")
+
     args = parser.parse_args()
 
     if args.command == "check":
@@ -266,6 +279,8 @@ def main():
         run_omcivlan(args.pcap, args.tpid_dei, json_output=args.json_output)
     elif args.command == "tcont-flow":
         run_tcont_flow(args.pcap, json_output=args.json_output)
+    elif args.command == "ai-overview":
+        run_ai_overview(args.pcap, model=args.model)
     else:
         parser.print_help()
 

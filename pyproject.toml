@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
     "scapy>=2.5.0",
     "rich>=13.0.0",
+    "requests>=2.31.0",
 ]
 license = {text = "MIT"}
 authors = [
