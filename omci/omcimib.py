@@ -1836,7 +1836,7 @@ class MIBInstance:
                 else:
                     val = chunk.hex().upper()
 
-                if attr_name == "Received frame VLAN tagging operation table":
+                if attr_type == "table":
                     if not isinstance(self.attributes.get(attr_name), list):
                         self.attributes[attr_name] = []
                     if val not in self.attributes[attr_name]:
