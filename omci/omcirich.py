@@ -117,7 +117,7 @@ def render_check_table(check_result):
     )
 
 
-def render_vlan_table(vlan_data_list):
+def render_vlan_table(vlan_data_list, tpid_dei=False):
     """
     Renders the OMCI VLAN Logic Analysis table (ME 171).
     - Decodes nested VLAN tagging operation rules.
@@ -146,15 +146,49 @@ def render_vlan_table(vlan_data_list):
         sub_table = Table(box=box.SIMPLE, header_style="italic yellow", expand=True)
         sub_table.add_column("Idx", width=4, justify="center")
         sub_table.add_column("Action / Semantic", width=25)
-        sub_table.add_column("Detailed Bit-Fields (Filter / Treatment / Tags Removed )")
+        field_title = (
+            "TPID/DEI Operations (Filter / Treatment )"
+            if tpid_dei
+            else "Detailed Bit-Fields (Filter / Treatment / Tags Removed)"
+        )
+        sub_table.add_column(field_title)
 
         for idx, rule in enumerate(vlan["rules"]):
             d = rule["data"]
-            bit_info = (
-                f"[dim]F:[/] [cyan]O:{d['f_out_prio']}/{d['f_out_vid']} I:{d['f_in_prio']}/{d['f_in_vid']} E:{d['f_eth_type']}[/] "
-                f"[dim]T:[/] [yellow]O:{d['t_out_prio']}/{d['t_out_vid']} I:{d['t_in_prio']}/{d['t_in_vid']}[/] "
-                f"[magenta]R:{d['t_tags_rem']}[/]"
-            )
+            if tpid_dei and "tpid_dei_operation" in rule:
+                op = rule["tpid_dei_operation"]
+
+                f_out_op = (
+                    f"[bold red]{op['op_f_out_tpid_dei']}[/]"
+                    if "DEI:1" in op["op_f_out_tpid_dei"]
+                    else op["op_f_out_tpid_dei"]
+                )
+                f_in_op = (
+                    f"[bold red]{op['op_f_in_tpid_dei']}[/]"
+                    if "DEI:1" in op["op_f_in_tpid_dei"]
+                    else op["op_f_in_tpid_dei"]
+                )
+                t_out_op = (
+                    f"[bold red]{op['op_t_out_tpid_dei']}[/]"
+                    if "DEI:1" in op["op_t_out_tpid_dei"]
+                    else op["op_t_out_tpid_dei"]
+                )
+                t_in_op = (
+                    f"[bold red]{op['op_t_in_tpid_dei']}[/]"
+                    if "DEI:1" in op["op_t_in_tpid_dei"]
+                    else op["op_t_in_tpid_dei"]
+                )
+
+                bit_info = (
+                    f"[dim]F:[/] [b blue]O:{f_out_op}[/][b blue] I:{f_in_op}[/] "
+                    f"[dim]T:[/] [b green]O:{t_out_op}[/][b green] I:{t_in_op}[/] "
+                )
+            else:
+                bit_info = (
+                    f"[dim]F:[/] [cyan]O:{d['f_out_prio']}/{d['f_out_vid']} I:{d['f_in_prio']}/{d['f_in_vid']} E:{d['f_eth_type']}[/] "
+                    f"[dim]T:[/] [yellow]O:{d['t_out_prio']}/{d['t_out_vid']} I:{d['t_in_prio']}/{d['t_in_vid']}[/] "
+                    f"[magenta]R:{d['t_tags_rem']}[/]"
+                )
 
             sub_table.add_row(
                 Text(str(idx), style="bold red"),

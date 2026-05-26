@@ -100,14 +100,14 @@ def run_omcitopo(pcap, output_html=None, json_output=False):
     print(f"[+] Topology visualization saved to: {output_html}")
 
 
-def run_omcivlan(pcap, json_output=False):
+def run_omcivlan(pcap, tpid_dei=False, json_output=False):
     mib_db = omciparser.get_all_mib_db(pcap)
     vlan_data = omciparser.get_vlan_data(mib_db)
 
     if json_output:
         print(json.dumps(vlan_data, indent=2))
     else:
-        omcirich.render_vlan_table(vlan_data)
+        omcirich.render_vlan_table(vlan_data, tpid_dei)
 
 
 def run_tcont_flow(pcap, json_output=False):
@@ -219,6 +219,9 @@ def main():
         parents=[common_args],
         help="Analye OMCI VLAN tagging logic (Table-driven)",
     )
+    vlan_p.add_argument(
+        "--tpid-dei", action="store_true", help="Display TPID/DEI operation"
+    )
     vlan_p.add_argument("pcap", help="Path to pcap file")
 
     # --- Sub-command: tcont_flow ---
@@ -260,7 +263,7 @@ def main():
     elif args.command in ["topology", "graphic"]:
         run_omcitopo(args.pcap, args.output_html, json_output=args.json_output)
     elif args.command == "vlan-tbl":
-        run_omcivlan(args.pcap, json_output=args.json_output)
+        run_omcivlan(args.pcap, args.tpid_dei, json_output=args.json_output)
     elif args.command == "tcont-flow":
         run_tcont_flow(args.pcap, json_output=args.json_output)
     else:

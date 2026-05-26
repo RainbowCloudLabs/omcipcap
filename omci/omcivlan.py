@@ -13,7 +13,9 @@ class VlanTaggingOperation:
         self.data = {}
         self._unpack_bits()
         self.action_type = ""
+        self.tpid_dei_operation = {}
         self._determine_action()
+        self._determine_operation_tpid_dei()
 
     def _unpack_bits(self):
         """G.988 Table 9.3.13-1"""
@@ -22,11 +24,11 @@ class VlanTaggingOperation:
             # Filter
             "f_out_prio": (v >> 124) & 0xF,  #  4 bits
             "f_out_vid": (v >> 111) & 0x1FFF,  # 13 bits
-            "f_out_tpid": (v >> 108) & 0x7,  #  3 bits
+            "f_out_tpid_dei": (v >> 108) & 0x7,  #  3 bits
             # "f_reserved": (v >> 96) & 0xFFF, # 12 bits
             "f_in_prio": (v >> 92) & 0xF,  #  4 bits
             "f_in_vid": (v >> 79) & 0x1FFF,  # 13 bits
-            "f_in_tpid": (v >> 76) & 0x7,  #  3 bits
+            "f_in_tpid_dei": (v >> 76) & 0x7,  #  3 bits
             # "f_reserved2": (v >> 68) & 0xFF,  #  8 bits
             "f_eth_type": (v >> 64) & 0xF,  #  4 bits
             # Treatment
@@ -34,11 +36,11 @@ class VlanTaggingOperation:
             # "t_reserved": (v >> 52) & 0x3FF,  # 10 bits
             "t_out_prio": (v >> 48) & 0xF,  #  4 bits
             "t_out_vid": (v >> 35) & 0x1FFF,  # 13 bits
-            "t_out_tpid": (v >> 32) & 0x7,  # 3 bits
+            "t_out_tpid_dei": (v >> 32) & 0x7,  # 3 bits
             # "t_reserved2": (v >> 20) & 0xFFF,  # 12 bits
             "t_in_prio": (v >> 16) & 0xF,  # 4bits
             "t_in_vid": (v >> 3) & 0x1FFF,  # 13bits
-            "t_in_tpid": v & 0x7,
+            "t_in_tpid_dei": v & 0x7,
         }
 
     @staticmethod
@@ -164,3 +166,36 @@ class VlanTaggingOperation:
                 action = "Double Default: Discard"
 
         self.action_type = action
+
+    def _determine_operation_tpid_dei(self):
+        """
+        Translate the 3-bit TPID/DEI filter and treatment opcodes into human-readable
+        and AI-friendly semantic strings based on ITU-T G.988.
+        """
+        d = self.data
+
+        filter_map = {
+            0b000: "TPID:any",
+            0b100: "TPID:8100",
+            0b101: "TPID:Input",
+            0b110: "TPID:Input,DEI:0",
+            0b111: "TPID:Input,DEI:1",
+        }
+
+        treatment_map = {
+            0b000: "Copy:Inner",
+            0b001: "Copy:Outer",
+            0b010: "TPID:Out,DEI:Inn",
+            0b011: "TPID:Out,DEI:Out",
+            0b100: "Force:8100",
+            0b101: "Reserved",
+            0b110: "TPID:Out,DEI:0",
+            0b111: "TPID:Out,DEI:1",
+        }
+
+        self.tpid_dei_operation = {
+            "op_f_in_tpid_dei": filter_map.get(d["f_in_tpid_dei"], "Unknown"),
+            "op_f_out_tpid_dei": filter_map.get(d["f_out_tpid_dei"], "Unknown"),
+            "op_t_in_tpid_dei": treatment_map.get(d["t_in_tpid_dei"], "Unknown"),
+            "op_t_out_tpid_dei": treatment_map.get(d["t_out_tpid_dei"], "Unknown"),
+        }

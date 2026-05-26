@@ -212,18 +212,18 @@ def test_cmd_vlan_json_output():
     expected_r0_data = {
         "f_out_prio": 15,
         "f_out_vid": 4096,
-        "f_out_tpid": 0,
+        "f_out_tpid_dei": 0,
         "f_in_prio": 14,
         "f_in_vid": 4096,
-        "f_in_tpid": 0,
+        "f_in_tpid_dei": 0,
         "f_eth_type": 0,
         "t_tags_rem": 3,
         "t_out_prio": 15,
         "t_out_vid": 0,
-        "t_out_tpid": 0,
+        "t_out_tpid_dei": 0,
         "t_in_prio": 15,
         "t_in_vid": 0,
-        "t_in_tpid": 0,
+        "t_in_tpid_dei": 0,
     }
 
     assert rule_0["data"] == expected_r0_data, "Rule 0 data dictionary mismatch"
@@ -236,18 +236,18 @@ def test_cmd_vlan_json_output():
     expected_r1_data = {
         "f_out_prio": 14,
         "f_out_vid": 4096,
-        "f_out_tpid": 0,
+        "f_out_tpid_dei": 0,
         "f_in_prio": 14,
         "f_in_vid": 4096,
-        "f_in_tpid": 0,
+        "f_in_tpid_dei": 0,
         "f_eth_type": 0,
         "t_tags_rem": 3,
         "t_out_prio": 15,
         "t_out_vid": 0,
-        "t_out_tpid": 0,
+        "t_out_tpid_dei": 0,
         "t_in_prio": 15,
         "t_in_vid": 0,
-        "t_in_tpid": 0,
+        "t_in_tpid_dei": 0,
     }
 
     assert rule_1["data"] == expected_r1_data, "Rule 1 data dictionary mismatch"
@@ -260,18 +260,18 @@ def test_cmd_vlan_json_output():
     expected_r2_data = {
         "f_out_prio": 15,
         "f_out_vid": 4096,
-        "f_out_tpid": 0,
+        "f_out_tpid_dei": 0,
         "f_in_prio": 8,
         "f_in_vid": 100,
-        "f_in_tpid": 0,
+        "f_in_tpid_dei": 0,
         "f_eth_type": 0,
         "t_tags_rem": 1,
         "t_out_prio": 15,
         "t_out_vid": 0,
-        "t_out_tpid": 0,
+        "t_out_tpid_dei": 0,
         "t_in_prio": 8,
         "t_in_vid": 100,
-        "t_in_tpid": 0,
+        "t_in_tpid_dei": 0,
     }
 
     assert rule_2["data"] == expected_r2_data, "Rule 2 data dictionary mismatch"
@@ -284,18 +284,18 @@ def test_cmd_vlan_json_output():
     expected_r3_data = {
         "f_out_prio": 15,
         "f_out_vid": 4096,
-        "f_out_tpid": 0,
+        "f_out_tpid_dei": 0,
         "f_in_prio": 8,
         "f_in_vid": 200,
-        "f_in_tpid": 0,
+        "f_in_tpid_dei": 0,
         "f_eth_type": 0,
         "t_tags_rem": 1,
         "t_out_prio": 15,
         "t_out_vid": 0,
-        "t_out_tpid": 0,
+        "t_out_tpid_dei": 0,
         "t_in_prio": 8,
         "t_in_vid": 200,
-        "t_in_tpid": 0,
+        "t_in_tpid_dei": 0,
     }
 
     assert rule_3["data"] == expected_r3_data, "Rule 3 data dictionary mismatch"

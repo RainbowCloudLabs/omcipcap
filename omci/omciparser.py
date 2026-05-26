@@ -385,6 +385,7 @@ def get_vlan_data(mib_db):
             rules.append(
                 {
                     "action_type": vlan_op.action_type,
+                    "tpid_dei_operation": vlan_op.tpid_dei_operation,
                     "data": vlan_op.data,
                 }
             )
