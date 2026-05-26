@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (c) 2026 Dong-Yuan Shih <daneshih1125@gmail.com>
+# Licensed under the MIT License.
+# See LICENSE file in the project root for full license information.
 import json
 import sys
 import argparse
@@ -44,14 +50,14 @@ def get_onu_capability(mib_db):
     }
 
 
-def generate_pcap_ai_overview(pcap_path):
+def generate_pcap_ai_overview_data(pcap_path):
     mib_data = omciparser.get_mib_db_data(pcap_path)
     check_result = omciparser.get_check_results(pcap_path)
     mib_db = omciparser.get_all_mib_db(pcap_path)
     vlan_data = omciparser.get_vlan_data(mib_db)
     tcont_flow = omciparser.get_flow_data(mib_db)
     topo_data = omciparser.get_topology_data(pcap_path)
-    overview = {
+    overview_data = {
         "check_summary": check_result,
         "mib_database": mib_data,
         "vlan_operation_data": vlan_data,
@@ -59,10 +65,15 @@ def generate_pcap_ai_overview(pcap_path):
         "topology_data": topo_data,
         "onu_capability": get_onu_capability(mib_db),
     }
+    return overview_data
 
+
+def generate_pcap_ai_overview_json(pcap_path):
+
+    overview_data = generate_pcap_ai_overview_data(pcap_path)
     output_file = "overview.json"
     with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(overview, f)
+        json.dump(overview_data, f)
     print(f"[+] Success! dumped to '{output_file}'\n")
 
 
@@ -77,4 +88,4 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(1)
 
-    generate_pcap_ai_overview(args.pcap_path)
+    generate_pcap_ai_overview_json(args.pcap_path)
