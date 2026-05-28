@@ -116,6 +116,34 @@ omcipcap mibdb --class-id 84,171 examples/omci.pcap
 omcipcap mibdb -j --only-upload examples/omci.pcap
 ```
 
+#### Semantic Extensions with --semantic-dir
+
+Customize attribute decoding with specific semantics
+
+##### Load semantic extensions from a directory and ME 134 option decoding
+```bash
+omcipcap mibdb --semantic-dir ./extensions --class-id 134 input.pcap
+```
+##### extensions/add_me134_option.py
+```python 
+try:
+    from omci.omcisemantic import OMCISemantic
+except ImportError:
+    pass
+
+
+def ip_host_mode(value):
+    if value & 0x1:
+        return "DHCP"
+    return "Static"
+
+
+OMCISemantic.register(134, "IP options", ip_host_mode)
+```
+
+
+
+
 ### omcipcap mibdb-diff
  Analyze two pcap files to identify differences in MIB provisioning
 ```bash
