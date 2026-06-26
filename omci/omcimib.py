@@ -1552,7 +1552,7 @@ ME_SPEC = {
         [
             ("Supported transfer protocols", 2, "hex", False),
             ("File type", 2, "hex", False),
-            ("File instanc", 2, "u16", False),
+            ("File instance", 2, "u16", False),
             ("Local file name pointer", 2, "u16", False),
             ("Network address pointer", 2, "u16", False),
             ("File transfer trigger", 1, "u8", False),
