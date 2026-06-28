@@ -14,10 +14,11 @@ import os
 def setup_test_files():
 
     subprocess.run(["python3", "utils/generate_dual_gem_shared_tcont.py"], check=True)
+    subprocess.run(["python3", "utils/generate_mibdb_vendor.py"], check=True)
 
     yield
 
-    test_files = ["single_unit_1_tont_2_gem.pcap"]
+    test_files = ["single_unit_1_tont_2_gem.pcap", "mibdb_vendor.pcap"]
 
     for f in test_files:
         if os.path.exists(f):
@@ -226,3 +227,52 @@ def test_mibdb_filter_class_id():
     assert me84_instances["3"]["VLAN filter list"]["text"] == "VID:200(P:0)"
     assert me84_instances["3"]["VLAN filter list"]["val"].startswith("00C8")
     assert me84_instances["3"]["Number of entries"]["val"] == "0x1"
+
+
+# test mibdb --only-vendor
+def test_mibdb_only_vendor():
+    result = subprocess.run(
+        [
+            "omcipcap",
+            "mibdb",
+            "-j",
+            "--only-vendor",
+            "mibdb_vendor.pcap",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    # Verify stdout is valid json
+    try:
+        mibdb_output = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        pytest.fail(f"stdout is not valid json\n{e}\n\nstdout:\n{result.stdout}")
+
+    # 1. Verify Class Filtering: Only 84 and 171 should exist
+    assert len(mibdb_output) == 2, (
+        f"Expected exactly 2 classes, got {len(mibdb_output)}"
+    )
+    assert "65300" in mibdb_output
+    assert "65400" in mibdb_output
+
+    me65300_inst1 = mibdb_output["65300"]["instances"]["1"]
+    assert (
+        me65300_inst1["0xf800"]["val"]
+        == "4354430000010001000000000000000000000000000000000000"
+    )
+    assert (
+        me65300_inst1["0xf800"]["text"]
+        == "4354430000010001000000000000000000000000000000000000"
+    )
+
+    me65400_inst1 = mibdb_output["65400"]["instances"]["1"]
+    assert (
+        me65400_inst1["0xc000"]["val"]
+        == "76312E302E35000001000000000000000000000000000000000000000000"
+    )
+    assert (
+        me65400_inst1["0xc000"]["text"]
+        == "76312E302E35000001000000000000000000000000000000000000000000"
+    )

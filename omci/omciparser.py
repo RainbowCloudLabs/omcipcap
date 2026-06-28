@@ -46,7 +46,7 @@ def get_omci_pkts(pcap_path, include_raw=False):
             continue
 
 
-def get_all_mib_db(pcap_path):
+def get_all_mib_db(pcap_path, only_vendor=False):
     """
     Parses a PCAP file to build a comprehensive MIB database representing the final state.
 
@@ -56,6 +56,8 @@ def get_all_mib_db(pcap_path):
 
     Args:
         pcap_path (str): The file path to the PCAP containing OMCI traffic.
+        only_vendor (bool): If True, only parses vendor-specific and future
+            standardization MEs.
 
     Returns:
         dict: A dictionary mapping (class_id, inst_id) tuples to MIBInstance objects,
@@ -64,6 +66,11 @@ def get_all_mib_db(pcap_path):
     mib_db = {}  # {(class_id, inst_id): MIBInstance}
 
     for i, omci_pkt, _ in get_omci_pkts(pcap_path):
+        if only_vendor and (
+            (not omci_pkt.mib_upload_is_vendor and not omci_pkt.mib_upload_is_feature)
+            and (not omci_pkt.is_vendor_me and not omci_pkt.is_feature_me)
+        ):
+            continue
         mib_entity = omci_pkt.mib_upload_entity
         if mib_entity:
             me_class = mib_entity["me_class"]
@@ -88,15 +95,16 @@ def get_all_mib_db(pcap_path):
                 mib_db[key] = omcimib.MIBInstance(me_class, me_inst)
             mib_db[key].update_from_create(omci_pkt.content)
         elif omci_pkt.action == OmciAction.SET:
-            if key in mib_db:
-                attr_mask = int.from_bytes(omci_pkt.content[:2], byteorder="big")
-                attr_data = omci_pkt.content[2:]
-                mib_db[key].update(attr_mask, attr_data)
+            if key not in mib_db:
+                mib_db[key] = omcimib.MIBInstance(me_class, me_inst)
+            attr_mask = int.from_bytes(omci_pkt.content[:2], byteorder="big")
+            attr_data = omci_pkt.content[2:]
+            mib_db[key].update(attr_mask, attr_data)
 
     return mib_db
 
 
-def get_mib_snapshot(pcap_path):
+def get_mib_snapshot(pcap_path, only_vendor=False):
     """
     Captures a snapshot of the MIB database immediately after the MIB Upload phase.
 
@@ -106,6 +114,8 @@ def get_mib_snapshot(pcap_path):
 
     Args:
         pcap_path (str): The file path to the PCAP containing OMCI traffic.
+        only_vendor (bool): If True, only parses vendor-specific and future
+            standardization MEs.
 
     Returns:
         dict: A dictionary mapping (class_id, inst_id) tuples to MIBInstance objects,
@@ -114,6 +124,12 @@ def get_mib_snapshot(pcap_path):
     snapshot = {}  # {(class_id, inst_id): MIBInstance}
 
     for i, omci_pkt, _ in get_omci_pkts(pcap_path):
+        if (
+            only_vendor
+            and not omci_pkt.mib_upload_is_vendor
+            and not omci_pkt.mib_upload_is_feature
+        ):
+            continue
         mib_entity = omci_pkt.mib_upload_entity
         if mib_entity:
             me_class = mib_entity["me_class"]
@@ -128,7 +144,7 @@ def get_mib_snapshot(pcap_path):
     return snapshot
 
 
-def get_mib_db_data(pcap_path, only_upload=False, class_ids=None):
+def get_mib_db_data(pcap_path, only_upload=False, only_vendor=False, class_ids=None):
     """
     Extracts and filters a structured Semantic IR of the MIB database from a PCAP.
 
@@ -142,6 +158,8 @@ def get_mib_db_data(pcap_path, only_upload=False, class_ids=None):
             represent the ONU's baseline state (Snapshot). If False,
             incorporates subsequent Set/Create operations to reflect
             the current live state.
+        only_vendor (bool): If True, only parses vendor-specific and future
+            standardization MEs
         class_ids (list[int], optional): A list of OMCI Class IDs to filter the
             output (e.g., [84, 171] for VLAN-related entities).
             Returns all classes if None.
@@ -161,13 +179,11 @@ def get_mib_db_data(pcap_path, only_upload=False, class_ids=None):
     # Initialize the MIB database by parsing the PCAP
     if only_upload:
         # get_mib_snapshot focuses on the initial provisioning baseline
-        mib_db = get_mib_snapshot(pcap_path)
+        mib_db = get_mib_snapshot(pcap_path, only_vendor)
     else:
-        # get_all_mib_db tracks the lifecycle of MEs throughout the trace
-        mib_db = get_all_mib_db(pcap_path)
+        mib_db = get_all_mib_db(pcap_path, only_vendor)
 
     mib_data = {}
-
     # Iterate through the parsed MIB entries (Key is a tuple of (class_id, inst_id))
     for (cid, iid), inst in mib_db.items():
         # Apply Class ID filtering for Semantic Reduction
@@ -178,6 +194,15 @@ def get_mib_db_data(pcap_path, only_upload=False, class_ids=None):
 
         if cid not in mib_data:
             mib_data[cid] = {"me_name": me_name, "instances": {}}
+
+        if inst.is_unknown:
+            for vendor_data in inst.vendor_data:
+                mask, raw_data = vendor_data
+                vendor_attr = hex(mask)
+                mib_data[cid]["instances"][iid] = {
+                    vendor_attr: {"val": raw_data, "text": raw_data}
+                }
+            continue
 
         # Convert raw attribute values into semantic strings (e.g., Hex for integers)
         # This ensures the data is deterministic and ready for AI/JSON reasoning.

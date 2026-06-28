@@ -1,0 +1,12 @@
+{
+  "65300": ["VENDOR 65300 ME", [
+    ["CTC", 4, "str", false],
+    ["attribute 2", 2, "u16", false],
+    ["attribute 3", 2, "u16", false],
+    ["attribute 4", 1, "u8", false]
+  ]],
+  "65400": ["VENDOR 65400 ME", [
+    ["FW Verion", 8, "str", false],
+    ["Health Check", 1, "u8", false]
+  ]]
+}

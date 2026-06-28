@@ -15,7 +15,9 @@ import argparse
 import json
 
 
-def run_mibdb(pcap, only_upload=False, class_id_str=None, json_output=False):
+def run_mibdb(
+    pcap, only_upload=False, only_vendor=False, class_id_str=None, json_output=False
+):
     class_ids = None
     if class_id_str:
         try:
@@ -26,7 +28,7 @@ def run_mibdb(pcap, only_upload=False, class_id_str=None, json_output=False):
             )
             return
 
-    mib_data = omciparser.get_mib_db_data(pcap, only_upload, class_ids)
+    mib_data = omciparser.get_mib_db_data(pcap, only_upload, only_vendor, class_ids)
 
     if json_output:
         print(json.dumps(mib_data, indent=2))
@@ -126,15 +128,17 @@ def load_mib_json(json_path):
     or define custom Vendor-specific ME specifications.
     """
     if not json_path or not os.path.exists(json_path):
-        return
+        return False
     try:
         with open(json_path, "r", encoding="utf-8") as f:
             custom_me = json.load(f)
             for cid, spec in custom_me.items():
                 omcimib.ME_SPEC[int(cid)] = tuple(spec)
-            # print(f"[*] Successfully loaded {len(custom_me)} custom ME specs.")
+        return True
     except Exception as e:
-        print(f"[!] Error loading MIB JSON: {e}")
+        print(f"[!] Error loading MIB FIile: {json_path}\n")
+        print(f"[!] MIB JSON Error: {e}\n")
+        return False
 
 
 def main():
@@ -167,6 +171,7 @@ def main():
     )
     mibdb_p.add_argument("pcap", help="Path to pcap file")
     mibdb_p.add_argument("--only-upload", action="store_true")
+    mibdb_p.add_argument("--only-vendor", action="store_true")
     mibdb_p.add_argument(
         "--class-id",
         help="Filter by ME class IDs (comma-separated, e.g., 84,171)",
@@ -234,6 +239,20 @@ def main():
 
     args = parser.parse_args()
 
+    # Check if pcap file exists (for commands that need it)
+    commands_need_pcap = [
+        "check",
+        "mibdb",
+        "vlan-tbl",
+        "tcont-flow",
+        "topology",
+        "graphic",
+    ]
+    if args.command in commands_need_pcap:
+        if not hasattr(args, "pcap") or not args.pcap or not os.path.exists(args.pcap):
+            print(f"[!] Error: PCAP file not found: {getattr(args, 'pcap', 'N/A')}")
+            return
+
     if args.command == "check":
         run_omcicheck(
             args.pcap,
@@ -244,15 +263,27 @@ def main():
         )
     elif args.command == "mibdb":
         if args.mib_json:
-            load_mib_json(args.mib_json)
+            if not load_mib_json(args.mib_json):
+                return
         if args.semantic_dir:
             omcisemantic.load_external_semantics(args.semantic_dir)
         run_mibdb(
-            args.pcap, args.only_upload, args.class_id, json_output=args.json_output
+            args.pcap,
+            args.only_upload,
+            args.only_vendor,
+            args.class_id,
+            json_output=args.json_output,
         )
     elif args.command in ["mibdb-diff", "diff"]:
+        if not os.path.exists(args.pcap1):
+            print(f"[!] Error: PCAP file not found: {args.pcap1}")
+            return
+        if not os.path.exists(args.pcap2):
+            print(f"[!] Error: PCAP file not found: {args.pcap2}")
+            return
         if args.mib_json:
-            load_mib_json(args.mib_json)
+            if not load_mib_json(args.mib_json):
+                return
         run_omcidiff(
             args.pcap1,
             args.pcap2,

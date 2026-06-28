@@ -102,6 +102,7 @@ omcipcap check with --rtt-threshold argument
  ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 Summary: Found 2 failures, 5 Vendor packets, 1 duplicate packets, 0 late packets
 ```
+
 ### omcipcap mibdb
 MIB Database Dump
 
@@ -141,7 +142,54 @@ def ip_host_mode(value):
 OMCISemantic.register(134, "IP options", ip_host_mode)
 ```
 
+#### Advanced: Custom ME JSON Format
+To define your own Vendor MEs for the --mib-json flag, use the following structure:
+```json
+{
+  "355": ["HWTC 355 ME", [
+    ["CPE mode", 3, "str", False],
+    ["Support VOIP", 1, "u8", False]
+  ]]
+}
+```
 
+##### Schema and Field Definitions
+
+The custom ME JSON configuration is a map where the top-level key represents the **ME Class ID**, and the value is a nested array containing the metadata and attribute schemas:
+
+* **`"355"`** *(String/Integer)*: The **ME Class ID** (Managed Entity Class Identifier) defined by the vendor.
+* **`"HWTC 355 ME"`** *(String)*: The human-readable **ME Name** descriptor used for CLI outputs and structured logs.
+* **`Attribute Array`** *(Array of Arrays)*: A sequence of arrays defining each attribute within the ME chronologically. Each attribute descriptor must contain exactly four positional fields in the following order:
+
+| Position | Field Name | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `0` | **Attribute Name** | `str` | The human-readable identifier of the specific attribute. |
+| `1` | **Byte Length** | `int` | The size of the attribute field in bytes within the OMCI payload message. |
+| `2` | **Data Type** | `str` | The decoding target data type. Supported types include primitive network byte representations such as `"u8"`, `"u16"`, `"u32"`, or byte sequences decoded as `"str"`. |
+| `3` | **Set-By-Create** | `bool` | Indicates whether the attribute property is **Set-By-Create** (SBC). Set to `True` if the attribute can be configured during the `Create` action phase; set to `False` if it is read-only or modified exclusively via `Set` actions. |
+
+
+#### Advanced: Filter and Decode Vendor-Specific MEs with Custom Semantics
+The combination of `--only-vendor`, `--mib-json`, and `--semantic-dir` allows you to isolate proprietary vendor behaviors, apply custom schemas, and inject high-level semantics into raw data dumps.
+
+```bash
+omcipcap mibdb --only-vendor examples/mibdb_vendor.pcap \
+    --mib-json examples/mibdb_vendor.json \
+    --semantic-dir examples/mibdb_vendor
+
+                              OMCI MIB Database Snapshot
+ ────────────────────────────────────────────────────────────────────────────────────
+  Class ID   ME Name                            Inst ID   Attributes (Semantic View)
+ ────────────────────────────────────────────────────────────────────────────────────
+     65300   Reserved for vendor-specific use         1   CTC: CTC
+                                                          attribute 2: 0x1
+                                                          attribute 3: 0x1
+                                                          attribute 4: Disabled
+ ────────────────────────────────────────────────────────────────────────────────────
+     65400   Reserved for vendor-specific use         1   FW Verion: v1.0.5
+                                                          Health Check: Enabled
+ ────────────────────────────────────────────────────────────────────────────────────
+```
 
 
 ### omcipcap mibdb-diff
@@ -170,16 +218,6 @@ When comparing a vendor-specific configuration (Class 355), omcidiff provides a 
 Summary: Added: 0, Removed: 0, Modified: 2
 ```
 
-Advanced: Custom ME JSON Format
-To define your own Vendor MEs for the --mib-json flag, use the following structure:
-```json
-{
-  "355": ["HWTC 355 ME", [
-    ["CPE mode", 3, "str", False],
-    ["Support VOIP", 1, "u8", False]
-  ]]
-}
-```
 
 ### omcipcap topology 
 ```
