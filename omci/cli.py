@@ -259,7 +259,7 @@ def main():
     overview_p = subparsers.add_parser(
         "overview-json",
         parents=[common_args],
-        help="Dump overview.json (Combind all Sub-command Output JSON)",
+        help="Dump overview.json (Combines all sub-command JSON outputs)",
     )
     overview_p.add_argument("pcap", help="Path to pcap file")
     overview_p.add_argument("--mib-json", help="Custom ME JSON definition")
