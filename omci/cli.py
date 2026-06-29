@@ -11,6 +11,7 @@ from omci import omcigrapher
 from omci import omciparser
 from omci import omcisemantic
 from omci import omcirich
+from omci import overview
 import argparse
 import json
 
@@ -122,6 +123,13 @@ def run_tcont_flow(pcap, json_output=False):
         omcirich.render_tcont_flow_tree(flow_data)
 
 
+def run_overview_json(pcap):
+    """
+    Output overview.json
+    """
+    overview.generate_pcap_ai_overview_json(pcap)
+
+
 def load_mib_json(json_path):
     """
     Dynamic loading of external JSON configurations, allowing users to overwritestandard ME definitions
@@ -139,6 +147,16 @@ def load_mib_json(json_path):
         print(f"[!] Error loading MIB FIile: {json_path}\n")
         print(f"[!] MIB JSON Error: {e}\n")
         return False
+
+
+def args_load_json_semantic(args):
+    if args.mib_json:
+        if not load_mib_json(args.mib_json):
+            return False
+    if args.semantic_dir:
+        if not omcisemantic.load_external_semantics(args.semantic_dir):
+            return False
+    return True
 
 
 def main():
@@ -180,7 +198,7 @@ def main():
     mibdb_p.add_argument("--mib-json", help="Custom ME JSON definition")
     mibdb_p.add_argument("--semantic-dir", help="ME attributes semantic extension dir")
 
-    # --- Sub-command: diff ---
+    # --- Sub-command: mibdb-diff (diff) ---
     diff_p = subparsers.add_parser(
         "mibdb-diff",
         aliases=["diff"],
@@ -203,7 +221,7 @@ def main():
     diff_p.add_argument("--mib-json", help="Custom ME JSON definition")
     diff_p.add_argument("--semantic-dir", help="ME attributes semantic extension dir")
 
-    # --- Sub-command: topology (formerly graphic) ---
+    # --- Sub-command: topology (graphic) ---
     topo_p = subparsers.add_parser(
         "topology",
         aliases=["graphic"],
@@ -218,7 +236,7 @@ def main():
         default=None,
     )
 
-    # --- Sub-command: vlan_tbl ---
+    # --- Sub-command: vlan-tbl ---
     vlan_p = subparsers.add_parser(
         "vlan-tbl",
         parents=[common_args],
@@ -229,7 +247,7 @@ def main():
     )
     vlan_p.add_argument("pcap", help="Path to pcap file")
 
-    # --- Sub-command: tcont_flow ---
+    # --- Sub-command: tcont-flow ---
     tcont_p = subparsers.add_parser(
         "tcont-flow",
         parents=[common_args],
@@ -237,6 +255,17 @@ def main():
     )
     tcont_p.add_argument("pcap", help="Path to pcap file")
 
+    # --- Sub-command: overview-json ---
+    overview_p = subparsers.add_parser(
+        "overview-json",
+        parents=[common_args],
+        help="Dump overview.json (Combind all Sub-command Output JSON)",
+    )
+    overview_p.add_argument("pcap", help="Path to pcap file")
+    overview_p.add_argument("--mib-json", help="Custom ME JSON definition")
+    overview_p.add_argument(
+        "--semantic-dir", help="ME attributes semantic extension dir"
+    )
     args = parser.parse_args()
 
     # Check if pcap file exists (for commands that need it)
@@ -247,6 +276,7 @@ def main():
         "tcont-flow",
         "topology",
         "graphic",
+        "overview-json",
     ]
     if args.command in commands_need_pcap:
         if not hasattr(args, "pcap") or not args.pcap or not os.path.exists(args.pcap):
@@ -262,11 +292,8 @@ def main():
             json_output=args.json_output,
         )
     elif args.command == "mibdb":
-        if args.mib_json:
-            if not load_mib_json(args.mib_json):
-                return
-        if args.semantic_dir:
-            omcisemantic.load_external_semantics(args.semantic_dir)
+        if not args_load_json_semantic(args):
+            return
         run_mibdb(
             args.pcap,
             args.only_upload,
@@ -281,9 +308,8 @@ def main():
         if not os.path.exists(args.pcap2):
             print(f"[!] Error: PCAP file not found: {args.pcap2}")
             return
-        if args.mib_json:
-            if not load_mib_json(args.mib_json):
-                return
+        if not args_load_json_semantic(args):
+            return
         run_omcidiff(
             args.pcap1,
             args.pcap2,
@@ -297,6 +323,10 @@ def main():
         run_omcivlan(args.pcap, args.tpid_dei, json_output=args.json_output)
     elif args.command == "tcont-flow":
         run_tcont_flow(args.pcap, json_output=args.json_output)
+    elif args.command == "overview-json":
+        if not args_load_json_semantic(args):
+            return
+        run_overview_json(args.pcap)
     else:
         parser.print_help()
 

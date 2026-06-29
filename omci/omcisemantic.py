@@ -37,7 +37,8 @@ def load_external_semantics(semantic_dir):
     OMCISemantic.register() calls.
     """
     if not os.path.isdir(semantic_dir):
-        return
+        print(f"[!] Error loading semantic directory: {semantic_dir}\n\n")
+        return False
 
     # Add dir to sys.path so scripts can import each other if needed
     sys.path.append(semantic_dir)
@@ -50,6 +51,8 @@ def load_external_semantics(semantic_dir):
             spec = importlib.util.spec_from_file_location(module_name, file_path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
+
+    return True
 
 
 ME_47_TP_TYPE = {
