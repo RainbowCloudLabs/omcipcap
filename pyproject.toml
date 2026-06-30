@@ -7,7 +7,7 @@ name = "omcipcap"
 dynamic = ["version"]
 readme = "README.md"
 description = "GPON/XGS-PON OMCI Semantic Analysis Framework for ITU-T G.988 protocols"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "scapy>=2.5.0",
     "rich>=13.0.0",
