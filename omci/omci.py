@@ -96,15 +96,24 @@ class OMCIPacket:
                 raise ValueError("Data too short")
             return OMCIExtended(data)
 
+    @staticmethod
+    def is_vendor_range(c):
+        # Table 11.2.4-1 Vendor ranges
+        return (240 <= c <= 255) or (350 <= c <= 399) or (65280 <= c <= 65535)
+
+    @staticmethod
+    def is_feature_range(c):
+        return (172 <= c <= 239) or (467 <= c <= 65279)
+
     @property
     def is_vendor_me(self):
         c = self.me_class
-        return (240 <= c <= 255) or (350 <= c <= 399) or (65280 <= c <= 65535)
+        return self.is_vendor_range(c)
 
     @property
     def is_feature_me(self):
         c = self.me_class
-        return (172 <= c <= 239) or (467 <= c <= 65279)
+        return self.is_feature_range(c)
 
     @classmethod
     def from_values(cls, transaction_id, message_type, me_class, inst_id, content=None):
@@ -172,15 +181,14 @@ class OMCIPacket:
         c = self.upload_me_class
         if c is None:
             return False
-        # Table 11.2.4-1 Vendor ranges
-        return (240 <= c <= 255) or (350 <= c <= 399) or (65280 <= c <= 65535)
+        return self.is_vendor_range(c)
 
     @property
     def mib_upload_is_feature(self):
         c = self.upload_me_class
         if c is None:
             return False
-        return (172 <= c <= 239) or (467 <= c <= 65279)
+        return self.is_feature_range(c)
 
 
 class OMCIBaseline(OMCIPacket):
