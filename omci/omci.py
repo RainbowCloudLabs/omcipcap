@@ -5,6 +5,7 @@
 # Licensed under the MIT License.
 # See LICENSE file in the project root for full license information.
 
+from scapy.all import rdpcap
 from enum import IntEnum
 
 
@@ -245,6 +246,56 @@ class OMCIExtended(OMCIPacket):
         super().__init__(raw_data)
         self.length = int.from_bytes(raw_data[8:10], byteorder="big")
         self.content = raw_data[10 : 10 + self.length]
+
+
+def omci_packets_from_pcap(pcap_path, include_raw=False):
+    """
+    Generator: yields OMCI packets from PCAP file.
+
+    Memory efficient for large PCAP files.
+
+    Args:
+        pcap_path (str): Path to PCAP file
+        include_raw (bool): Include raw packet data
+
+    Yields:
+        tuple: (packet_no, omci_pkt, raw_pkt or None)
+    """
+    try:
+        raw_pkts = rdpcap(pcap_path)
+    except Exception as e:
+        print(f"Error reading pcap: {e}")
+        return
+
+    for i, raw_pkt in enumerate(raw_pkts):
+        if not raw_pkt.haslayer("Ether") or raw_pkt.getlayer("Ether").type != 0x88B5:
+            continue
+
+        try:
+            raw_data = bytes(raw_pkt.lastlayer())
+            omci_pkt = OMCIPacket.from_raw(raw_data)
+
+            if isinstance(omci_pkt, OMCIBaseline):
+                yield i, omci_pkt, (raw_pkt if include_raw else None)
+
+        except Exception:
+            continue
+
+
+def load_omci_packets(pcap_path, include_raw=False):
+    """
+    Loader: loads all OMCI packets from PCAP file into memory.
+
+    Convenience wrapper around omci_packets_from_pcap().
+
+    Args:
+        pcap_path (str): Path to PCAP file
+        include_raw (bool): Include raw packet data
+
+    Returns:
+        list: List of (packet_no, omci_pkt, raw_pkt or None) tuples
+    """
+    return list(omci_packets_from_pcap(pcap_path, include_raw))
 
 
 # vim: set ts=4 sw=4 et:

@@ -8,6 +8,7 @@ import json
 import sys
 import argparse
 from omci import omciparser
+from omci.omci import load_omci_packets
 from omci.omcimib import OMCIClass
 
 
@@ -51,12 +52,13 @@ def get_onu_capability(mib_db):
 
 
 def generate_pcap_ai_overview_data(pcap_path):
-    mib_data = omciparser.get_mib_db_data(pcap_path)
-    check_result = omciparser.get_check_results(pcap_path)
-    mib_db = omciparser.get_all_mib_db(pcap_path)
+    omci_pkts = load_omci_packets(pcap_path, include_raw=True)
+    mib_data = omciparser.get_mib_db_data(omci_pkts)
+    check_result = omciparser.get_check_results(omci_pkts)
+    topo_data = omciparser.get_topology_data(omci_pkts)
+    mib_db = omciparser.get_all_mib_db(omci_pkts)
     vlan_data = omciparser.get_vlan_data(mib_db)
     tcont_flow = omciparser.get_flow_data(mib_db)
-    topo_data = omciparser.get_topology_data(pcap_path)
     overview_data = {
         "check_summary": check_result,
         "mib_database": mib_data,

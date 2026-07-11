@@ -12,12 +12,17 @@ from omci import omciparser
 from omci import omcisemantic
 from omci import omcirich
 from omci import overview
+from omci.omci import load_omci_packets
 import argparse
 import json
 
 
 def run_mibdb(
-    pcap, only_upload=False, only_vendor=False, class_id_str=None, json_output=False
+    pcap_path,
+    only_upload=False,
+    only_vendor=False,
+    class_id_str=None,
+    json_output=False,
 ):
     class_ids = None
     if class_id_str:
@@ -29,7 +34,10 @@ def run_mibdb(
             )
             return
 
-    mib_data = omciparser.get_mib_db_data(pcap, only_upload, only_vendor, class_ids)
+    omci_pkts = load_omci_packets(pcap_path, include_raw=False)
+    mib_data = omciparser.get_mib_db_data(
+        omci_pkts, only_upload, only_vendor, class_ids
+    )
 
     if json_output:
         print(json.dumps(mib_data, indent=2))
@@ -45,8 +53,9 @@ def run_omcicheck(
     json_output=False,
 ):
 
+    omci_pkts = load_omci_packets(pcap_path, include_raw=True)
     check_result = omciparser.get_check_results(
-        pcap_path, only_vendor, only_failed, rtt_threshold
+        omci_pkts, only_vendor, only_failed, rtt_threshold
     )
 
     if json_output:
@@ -57,12 +66,14 @@ def run_omcicheck(
 
 def run_omcidiff(pcap1, pcap2, full_diff=False, class_id_str=None, json_output=False):
     class_ids = None
+    omci_pkts1 = load_omci_packets(pcap1, include_raw=False)
+    omci_pkts2 = load_omci_packets(pcap2, include_raw=False)
     if full_diff:
-        mib1 = omciparser.get_all_mib_db(pcap1)
-        mib2 = omciparser.get_all_mib_db(pcap2)
+        mib1 = omciparser.get_all_mib_db(omci_pkts1)
+        mib2 = omciparser.get_all_mib_db(omci_pkts2)
     else:
-        mib1 = omciparser.get_mib_snapshot(pcap1)
-        mib2 = omciparser.get_mib_snapshot(pcap2)
+        mib1 = omciparser.get_mib_snapshot(omci_pkts1)
+        mib2 = omciparser.get_mib_snapshot(omci_pkts2)
 
     if class_id_str:
         try:
@@ -86,15 +97,16 @@ def run_omcidiff(pcap1, pcap2, full_diff=False, class_id_str=None, json_output=F
         omcirich.render_diff_table(diff_data)
 
 
-def run_omcitopo(pcap, output_html=None, json_output=False):
-    topo_data = omciparser.get_topology_data(pcap)
+def run_omcitopo(pcap_path, output_html=None, json_output=False):
+    omci_pkts = load_omci_packets(pcap_path, include_raw=False)
+    topo_data = omciparser.get_topology_data(omci_pkts)
 
     if json_output:
         print(json.dumps(topo_data, indent=4))
         return
 
     if not output_html:
-        base_name = os.path.splitext(pcap)[0]
+        base_name = os.path.splitext(pcap_path)[0]
         output_html = f"{base_name}.html"
 
     html_content = omcigrapher.export_to_html(topo_data)
@@ -103,8 +115,9 @@ def run_omcitopo(pcap, output_html=None, json_output=False):
     print(f"[+] Topology visualization saved to: {output_html}")
 
 
-def run_omcivlan(pcap, tpid_dei=False, json_output=False):
-    mib_db = omciparser.get_all_mib_db(pcap)
+def run_omcivlan(pcap_path, tpid_dei=False, json_output=False):
+    omci_pkts = load_omci_packets(pcap_path, include_raw=False)
+    mib_db = omciparser.get_all_mib_db(omci_pkts)
     vlan_data = omciparser.get_vlan_data(mib_db)
 
     if json_output:
@@ -113,8 +126,9 @@ def run_omcivlan(pcap, tpid_dei=False, json_output=False):
         omcirich.render_vlan_table(vlan_data, tpid_dei)
 
 
-def run_tcont_flow(pcap, json_output=False):
-    mib_db = omciparser.get_all_mib_db(pcap)
+def run_tcont_flow(pcap_path, json_output=False):
+    omci_pkts = load_omci_packets(pcap_path, include_raw=False)
+    mib_db = omciparser.get_all_mib_db(omci_pkts)
     flow_data = omciparser.get_flow_data(mib_db)
 
     if json_output:

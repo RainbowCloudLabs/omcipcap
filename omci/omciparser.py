@@ -5,57 +5,24 @@
 # Licensed under the MIT License.
 # See LICENSE file in the project root for full license information.
 
-from scapy.all import rdpcap
 from omci import omcimib
 from omci import omciflow
 from omci import omcivlan
-from omci.omci import OMCIBaseline, OMCIPacket, OmciAction, OmciResult
+from omci.omci import OmciAction, OmciResult
 from omci.omcimib import OMCIClass
 from omci.omcimib import SENSITIVE_ME_CLASSES, SENSITIVE_ME_ATTRIBUTES
 
 
-def get_omci_pkts(pcap_path, include_raw=False):
+def get_all_mib_db(omci_pkts, only_vendor=False):
     """
-    Reads pcap and yields filtered OMCI Baseline packets.
-
-    Args:
-        pcap_path (str): Path to the pcap file.
-
-    Yields:
-        tuple: (packet_no, omci_pkt, raw_pkt)
-    """
-    try:
-        raw_pkts = rdpcap(pcap_path)
-    except Exception as e:
-        print(f"Error reading pcap: {e}")
-        return
-
-    for i, raw_pkt in enumerate(raw_pkts):
-        # Filter for OMCI EtherType (0x88B5)
-        if not raw_pkt.haslayer("Ether") or raw_pkt.getlayer("Ether").type != 0x88B5:
-            continue
-
-        try:
-            raw_data = bytes(raw_pkt.lastlayer())
-            omci_pkt = OMCIPacket.from_raw(raw_data)
-
-            if isinstance(omci_pkt, OMCIBaseline):
-                yield i, omci_pkt, (raw_pkt if include_raw else None)
-
-        except Exception:
-            continue
-
-
-def get_all_mib_db(pcap_path, only_vendor=False):
-    """
-    Parses a PCAP file to build a comprehensive MIB database representing the final state.
+    Builds MIB database from OMCI packets.
 
     This function processes both the initial 'MIB Upload' phase and subsequent
     'OLT Provisioning' (Create/Set actions) to capture dynamic changes in
     Managed Entities (MEs).
 
     Args:
-        pcap_path (str): The file path to the PCAP containing OMCI traffic.
+        omci_pkts : list of tuple: (packet_no, omci_pkt, raw_pkt)
         only_vendor (bool): If True, only parses vendor-specific and future
             standardization MEs.
 
@@ -65,7 +32,7 @@ def get_all_mib_db(pcap_path, only_vendor=False):
     """
     mib_db = {}  # {(class_id, inst_id): MIBInstance}
 
-    for i, omci_pkt, _ in get_omci_pkts(pcap_path):
+    for _, omci_pkt, _ in omci_pkts:
         if only_vendor and (
             (not omci_pkt.mib_upload_is_vendor and not omci_pkt.mib_upload_is_feature)
             and (not omci_pkt.is_vendor_me and not omci_pkt.is_feature_me)
@@ -104,7 +71,7 @@ def get_all_mib_db(pcap_path, only_vendor=False):
     return mib_db
 
 
-def get_mib_snapshot(pcap_path, only_vendor=False):
+def get_mib_snapshot(omci_pkts, only_vendor=False):
     """
     Captures a snapshot of the MIB database immediately after the MIB Upload phase.
 
@@ -113,7 +80,7 @@ def get_mib_snapshot(pcap_path, only_vendor=False):
     actions (such as Create or Set) occur.
 
     Args:
-        pcap_path (str): The file path to the PCAP containing OMCI traffic.
+        omci_pkts : list of tuple: (packet_no, omci_pkt, raw_pkt)
         only_vendor (bool): If True, only parses vendor-specific and future
             standardization MEs.
 
@@ -123,7 +90,7 @@ def get_mib_snapshot(pcap_path, only_vendor=False):
     """
     snapshot = {}  # {(class_id, inst_id): MIBInstance}
 
-    for i, omci_pkt, _ in get_omci_pkts(pcap_path):
+    for _, omci_pkt, _ in omci_pkts:
         if (
             only_vendor
             and not omci_pkt.mib_upload_is_vendor
@@ -144,16 +111,16 @@ def get_mib_snapshot(pcap_path, only_vendor=False):
     return snapshot
 
 
-def get_mib_db_data(pcap_path, only_upload=False, only_vendor=False, class_ids=None):
+def get_mib_db_data(omci_pkts, only_upload=False, only_vendor=False, class_ids=None):
     """
-    Extracts and filters a structured Semantic IR of the MIB database from a PCAP.
+    Extracts and filters a structured Semantic IR of the MIB database from OMCI packets.
 
     This function serves as the core data provider for the 'mibdb' command,
     transforming raw MIB entries into a clean, hierarchical dictionary
     suitable for JSON export or professional table rendering.
 
     Args:
-        pcap_path (str): Path to the target Wireshark PCAP file.
+        omci_pkts : list of tuple: (packet_no, omci_pkt, raw_pkt)
         only_upload (bool): If True, only parses the MIB Upload sequence to
             represent the ONU's baseline state (Snapshot). If False,
             incorporates subsequent Set/Create operations to reflect
@@ -176,12 +143,11 @@ def get_mib_db_data(pcap_path, only_upload=False, only_vendor=False, class_ids=N
                 }
             }
     """
-    # Initialize the MIB database by parsing the PCAP
     if only_upload:
         # get_mib_snapshot focuses on the initial provisioning baseline
-        mib_db = get_mib_snapshot(pcap_path, only_vendor)
+        mib_db = get_mib_snapshot(omci_pkts, only_vendor)
     else:
-        mib_db = get_all_mib_db(pcap_path, only_vendor)
+        mib_db = get_all_mib_db(omci_pkts, only_vendor)
 
     mib_data = {}
     # Iterate through the parsed MIB entries (Key is a tuple of (class_id, inst_id))
@@ -226,19 +192,19 @@ def get_mib_db_data(pcap_path, only_upload=False, only_vendor=False, class_ids=N
 
 
 def get_check_results(
-    pcap_path, only_vendor=False, only_failed=False, rtt_threshold=1000
+    omci_pkts, only_vendor=False, only_failed=False, rtt_threshold=1000
 ):
     """
     Analyzes OMCI traffic to identify protocol anomalies and vendor-specific configurations.
 
-    This function performs a comprehensive check on the PCAP file, detecting:
+    This function performs a comprehensive check on OMCI packets, detecting:
     1. Response Failures: Non-success results from the ONU.
     2. Late Responses: ONU responses exceeding the specified RTT threshold.
     3. Duplicate TIDs: Reused Transaction IDs in requests.
     4. Vendor-Specific MEs: Non-standard Managed Entities.
 
     Args:
-        pcap_path (str): Path to the PCAP file.
+        omci_pkts : list of tuple: (packet_no, omci_pkt, raw_pkt)
         only_vendor (bool): If True, filters results to only include vendor-specific MEs.
         only_failed (bool): If True, filters results to only include failed responses.
         rtt_threshold (int): Round-trip time threshold in milliseconds (default 1000ms).
@@ -265,7 +231,7 @@ def get_check_results(
         },
     }
 
-    for i, omci_pkt, raw_pkt in get_omci_pkts(pcap_path, include_raw=True):
+    for i, omci_pkt, raw_pkt in omci_pkts:
         is_fail = False
         is_vendor = False
         is_duplicate = False
@@ -572,18 +538,17 @@ INTERESTED_CLASSES = {
 }
 
 
-def get_topology_data(pcap_path):
+def get_topology_data(omci_pkts):
     """
-    High-level entry point to extract topology from a pcap file.
+    High-level entry point to extract topology from OMCI packets.
 
     Args:
-        pcap_path (str): Path to the input pcap file.
+        omci_pkts : list of tuple: (packet_no, omci_pkt, raw_pkt)
 
     Returns:
         dict: The abstract topology data containing 'nodes' and 'edges'.
     """
-    # Assume get_all_mib_db is imported or defined to parse pcap into MIB DB
-    mib_db = get_all_mib_db(pcap_path)
+    mib_db = get_all_mib_db(omci_pkts)
     return generate_topo_data(mib_db)
 
 
