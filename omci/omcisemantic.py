@@ -332,6 +332,55 @@ def trans_mac_address(value):
     return ":".join(s[i : i + 2] for i in range(0, 12, 2))
 
 
+ADMIN_STATE_MAP = {0: "Unlock", 1: "Lock"}
+OP_STATE_MAP = {0: "Enable", 1: "Disable"}
+
+
+def trans_admin_state(value):
+    """
+    Administrative state: 1 -> Lock, 0 -> Unlock
+    """
+    return ADMIN_STATE_MAP.get(value, f"Unknown ({value})")
+
+
+def trans_op_state(value):
+    """
+    Operational state: 1 -> Disable, 0 -> Enable
+    """
+    return OP_STATE_MAP.get(value, f"Unknown ({value})")
+
+
+admin_state_mes = [
+    6,
+    11,
+    53,
+    82,
+    90,
+    256,
+    264,
+    302,
+    329,
+    340,
+]
+
+op_state_mes = [
+    6,
+    11,
+    53,
+    82,
+    90,
+    256,
+    266,
+    281,
+    329,
+]
+
+for me in admin_state_mes:
+    OMCISemantic.register(me, "Administrative state", trans_admin_state)
+
+for me in op_state_mes:
+    OMCISemantic.register(me, "Operational state", trans_op_state)
+
 OMCISemantic.register(47, "TP type", me47_tp_type_translator)
 OMCISemantic.register(171, "Association type", me171_assoc_type_translator)
 OMCISemantic.register(171, "Downstream mode", me171_downstream_mode_translator)

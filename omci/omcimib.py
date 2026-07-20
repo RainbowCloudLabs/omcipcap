@@ -265,8 +265,8 @@ ME_SPEC = {
             ("Serial Number", 8, "hex", False),
             ("Version", 14, "str", False),
             ("Vendor Id", 4, "hex", False),
-            ("Administrative State", 1, "u8", True),
-            ("Operational State", 1, "u8", False),
+            ("Administrative state", 1, "u8", True),
+            ("Operational state", 1, "u8", False),
             ("Bridged or IP Ind", 1, "u8", False),
             ("Equipment Id", 20, "str", False),
             ("Card Configuration", 1, "u8", True),
@@ -294,8 +294,8 @@ ME_SPEC = {
             ("Sensed Type", 1, "u8", False),
             ("Auto Detection Configuration", 1, "u8", False),
             ("Ethernet Loopback Configuration", 1, "u8", False),
-            ("Administrative State", 1, "u8", False),
-            ("Operational State", 1, "u8", False),
+            ("Administrative state", 1, "u8", False),
+            ("Operational state", 1, "u8", False),
             ("Configuration Ind", 1, "u8", False),
             ("Max Frame Size", 2, "u16", False),
             ("DTE or DCE", 1, "u8", False),
@@ -480,8 +480,8 @@ ME_SPEC = {
     82: (
         "PPTP Video UNI",
         [
-            ("Administrative State", 1, "u8", False),
-            ("Operational State", 1, "u8", False),
+            ("Administrative state", 1, "u8", False),
+            ("Operational state", 1, "u8", False),
             ("ARC", 1, "u8", False),
             ("ARC Interval", 1, "u8", False),
             ("Power Control", 1, "u8", False),
@@ -509,8 +509,8 @@ ME_SPEC = {
     90: (
         "PPTP Video ANI",
         [
-            ("Administrative State", 1, "u8", False),
-            ("Operational State", 1, "u8", False),
+            ("Administrative state", 1, "u8", False),
+            ("Operational state", 1, "u8", False),
             ("ARC", 1, "u8", False),
             ("ARC Interval", 1, "u8", False),
             ("Frequency Range Low", 1, "u8", False),
