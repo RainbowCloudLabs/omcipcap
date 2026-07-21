@@ -25,13 +25,13 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 
 | Command | Description | Output Modes |
 |---|---|---|
-| `check` | Analyze RTT, TID duplicates, and ME failures | Table / JSON |
-| `mibdb` | Dump the Semantic MIB Database | Table / JSON |
-| `mibdb-diff (diff)` | Compare two MIBs with semantic decoding | Table / JSON |
-| `vlan-tbl` | Analyze OMCI VLAN tagging logic (Table-driven) | Table / JSON |
-| `tcont-flow` | Trace T-CONT → GEM → PQ traffic hierarchy | Table / JSON |
-| `topology (graphic)` | Generate interactive topology HTML | Interactive HTML / JSON |
-| `overview-json` | Dump overview.json (Combine all Sub-command Output JSON)| JSON |
+| `check` | Analyze RTT, TID duplicates, and ME failures | Table / JSON / Markdown |
+| `mibdb` | Dump the Semantic MIB Database | Table / JSON / Markdown |
+| `mibdb-diff (diff)` | Compare two MIBs with semantic decoding | Table / JSON / Markdown |
+| `vlan-tbl` | Analyze OMCI VLAN tagging logic (Table-driven) | Table / JSON / Markdown |
+| `tcont-flow` | Trace T-CONT → GEM → PQ traffic hierarchy | Table / JSON / Markdown |
+| `topology (graphic)` | Generate interactive topology HTML | Interactive HTML / JSON / Markdown |
+| `overview-json` | Dump overview.json (combined JSON output from multiple subcommands)| JSON |
 
 
 
