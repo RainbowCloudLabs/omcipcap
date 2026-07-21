@@ -579,3 +579,67 @@ def render_tcont_flow_md(flow_data):
     parts.append(render_section("T-CONT / GEM Flow Tree", "\n".join(tree_lines)))
 
     return "\n".join(parts).rstrip() + "\n"
+
+
+def render_topology_md(topo_data):
+    """
+    Schema from omciparser.get_topology_data():
+
+    {
+      "nodes": [
+        {
+          "id": str,
+          "class_id": int,
+          "inst_id": int,
+          "name": str,
+          "attributes": { ... }   # not rendered here
+        }
+      ],
+      "edges": [
+        {
+          "source": str,
+          "target": str,
+          "relation": str,
+          "label": str
+        }
+      ]
+    }
+    """
+    nodes = topo_data.get("nodes", [])
+    edges = topo_data.get("edges", [])
+
+    if not nodes and not edges:
+        return render_section("Topology", "_No topology data found._")
+
+    parts = []
+
+    node_rows = [
+        [n.get("id", ""), n.get("class_id", ""), n.get("inst_id"), n.get("name", "")]
+        for n in nodes
+    ]
+    parts.append(
+        render_section(
+            "Topology Nodes",
+            render_markdown_table(
+                ["Node ID", "Class ID", "Instance ID", "ME Name"], node_rows
+            ),
+        )
+    )
+
+    edge_rows = [
+        [
+            e.get("source", ""),
+            e.get("target", ""),
+            e.get("relation", ""),
+            e.get("label", ""),
+        ]
+        for e in edges
+    ]
+    parts.append(
+        render_section(
+            "Topology Edges",
+            render_markdown_table(["Source", "Target", "Relation", "Label"], edge_rows),
+        )
+    )
+
+    return "\n".join(parts).rstrip() + "\n"

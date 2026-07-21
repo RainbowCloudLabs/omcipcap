@@ -141,12 +141,15 @@ def run_omcidiff(
     )
 
 
-def run_omcitopo(pcap_path, output_html=None, json_output=False):
+def run_omcitopo(pcap_path, output_html=None, json_output=False, md_output=False):
     omci_pkts = load_omci_packets(pcap_path, include_raw=False)
     topo_data = omciparser.get_topology_data(omci_pkts)
 
     if json_output:
         print(json.dumps(topo_data, indent=4))
+        return
+    elif md_output:
+        print(omcimd.render_topology_md(topo_data))
         return
 
     if not output_html:
@@ -392,7 +395,12 @@ def main():
             md_output=args.md,
         )
     elif args.command in ["topology", "graphic"]:
-        run_omcitopo(args.pcap, args.output_html, json_output=args.json_output)
+        run_omcitopo(
+            args.pcap,
+            args.output_html,
+            json_output=args.json_output,
+            md_output=args.md,
+        )
     elif args.command == "vlan-tbl":
         run_omcivlan(
             args.pcap,
@@ -416,4 +424,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -172,3 +172,47 @@ def test_cmd_mibdb_md_output():
     assert "32768" in output
     assert "0x3e8" in output  # Alloc-ID 1000
     assert "0x3e9" in output  # GEM Port ID 1001
+
+
+def test_cmd_topology_md_output():
+    result = subprocess.run(
+        [
+            "omcipcap",
+            "topology",
+            "--md",
+            "single_unit_1_tont_2_gem.pcap",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout
+
+    assert "## Topology Nodes" in output
+    assert "## Topology Edges" in output
+
+    assert "| Node ID | Class ID | Instance ID | ME Name |" in output
+    assert "| Source | Target | Relation | Label |" in output
+
+    # Key nodes
+    assert "262_32768" in output
+    assert "T_CONT" in output
+    assert "11_257" in output
+    assert "PPTP_ETHERNET_UNI" in output
+    assert "171_1" in output
+    assert "EXTENDED_VLAN_TAGGING_OPERATION_CONFIGURATION_DATA" in output
+    assert "268_1" in output
+    assert "GEM_PORT_NETWORK_CTP" in output
+
+    # Key edges
+    assert "vlan_op_associated_with_me" in output
+    assert "belongs_to_bridge" in output
+    assert "traffic_mapped_to_tcont" in output
+    assert "iw_linked_to_gem_port" in output
+    assert "vlan_filter_bind_to_port" in output
+
+    # Specific edge pairs
+    assert "171_1" in output and "11_257" in output
+    assert "268_1" in output and "262_32768" in output
+    assert "266_1" in output and "268_1" in output
