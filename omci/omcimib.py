@@ -363,7 +363,7 @@ ME_SPEC = {
     47: (
         "MAC bridge port configuration data",
         [
-            ("Bridge id pointer", 2, "u16", True),
+            ("Bridge ID pointer", 2, "u16", True),
             ("Port num", 1, "u8", True),
             ("TP type", 1, "u8", True),
             ("TP pointer", 2, "u16", True),

@@ -613,7 +613,7 @@ def generate_topo_data(mib_db):
         # ME 47: MAC Bridge Port Configuration Data
         elif class_id == OMCIClass.MAC_BRIDGE_PORT_CONFIGURATION_DATA:
             # Bridge ID Pointer (Connects to ME 45)
-            b_ptr = attrs.get("Bridge id pointer")
+            b_ptr = attrs.get("Bridge ID pointer")
             if b_ptr is not None:
                 edges.append(
                     {
@@ -626,10 +626,17 @@ def generate_topo_data(mib_db):
 
             # TP Pointer (Connects to various Physical/Termination points)
             tp_ptr = attrs.get("TP pointer")
+            tp_type = attrs.get("TP type")
             if tp_ptr is not None:
                 # 11: PPTP, 130: 802.1p, 134: IP Host, 329: VEIP, 281: MCAST
-                for t_cid in [11, 130, 134, 329, 281]:
-                    if (t_cid, tp_ptr) in mib_db:
+                for t_type, t_cid in [
+                    (1, OMCIClass.PPTP_ETHERNET_UNI),
+                    (3, OMCIClass.DOT1P_MAPPER_SERVICE_PROFILE),
+                    (4, OMCIClass.IP_HOST_CONFIG_DATA),
+                    (11, OMCIClass.VIRTUAL_ETHERNET_INTERFACE_POINT),
+                    (6, OMCIClass.MULTICAST_GEM_INTERWORKING_TERMINATION_POINT),
+                ]:
+                    if tp_type == t_type and (t_cid, tp_ptr) in mib_db:
                         edges.append(
                             {
                                 "source": node_id,
