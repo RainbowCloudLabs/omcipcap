@@ -167,6 +167,18 @@ def render_check_md(check_result):
     return "\n".join(parts).rstrip() + "\n"
 
 
+def eth_type_str(eth_type):
+    _ETH_TYPE_MAP = {
+        0: "Any",
+        1: "IPoE (0x0800)",
+        2: "PPPoE (0x8863/0x8864)",
+        3: "ARP (0x0806)",
+        4: "IPv6 IPoE (0x86DD)",
+        5: "EAPOL (0x888E)",
+    }
+    return _ETH_TYPE_MAP.get(eth_type, f"Unknown(0x{eth_type:x})")
+
+
 def render_vlan_md(vlan_data):
     """
     Schema from omciparser.get_vlan_data():
@@ -228,21 +240,51 @@ def render_vlan_md(vlan_data):
 
         rule_rows = []
         for idx, rule in enumerate(rules):
+            tpid_dei_op = rule.get("tpid_dei_operation", {})
+            vlan_data = rule.get("data", {})
             rule_rows.append(
                 [
                     idx,
                     rule.get("action_type", ""),
-                    rule.get("tpid_dei_operation", ""),
-                    rule.get("data", ""),
+                    tpid_dei_op.get("op_f_out_tpid_dei", ""),
+                    tpid_dei_op.get("op_f_in_tpid_dei", ""),
+                    tpid_dei_op.get("op_t_out_tpid_dei", ""),
+                    tpid_dei_op.get("op_t_in_tpid_dei", ""),
+                    vlan_data.get("f_out_prio", ""),
+                    vlan_data.get("f_out_vid", ""),
+                    vlan_data.get("f_in_prio", ""),
+                    vlan_data.get("f_in_vid", ""),
+                    eth_type_str(vlan_data.get("f_eth_type", "")),
+                    vlan_data.get("t_tags_rem", ""),
+                    vlan_data.get("t_out_prio", ""),
+                    vlan_data.get("t_out_vid", ""),
+                    vlan_data.get("t_in_prio", ""),
+                    vlan_data.get("t_in_vid", ""),
                 ]
             )
-
         if rule_rows:
             parts.append(
                 render_section(
                     f"VLAN Rules for ME Inst ID {inst_id}",
                     render_markdown_table(
-                        ["Idx", "Action Type", "TPID/DEI Operation", "Data"],
+                        [
+                            "Idx",
+                            "Action Type",
+                            "Filter outer TPID/DEI",
+                            "Filter inner TPID/DEI",
+                            "Treatment outer TPID/DEI",
+                            "Treatment inner TPID/DEI",
+                            "Filter outer priority",
+                            "Filter outer VID",
+                            "Filter inner priority",
+                            "Filter inner VID",
+                            "Filter Ethertype",
+                            "Treatment tags to remove",
+                            "Treatment outer priority",
+                            "Treatment outer VID",
+                            "Treatment inner priority",
+                            "Treatment inner VID",
+                        ],
                         rule_rows,
                     ),
                 )

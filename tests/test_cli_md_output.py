@@ -82,18 +82,29 @@ def test_cmd_vlan_md_output():
         text=True,
         check=True,
     )
-
     output = result.stdout
 
     assert "## VLAN Operation Summary" in output
     assert "## VLAN Rules for ME Inst ID 1" in output
-
     assert "Physical path termination point Ethernet UNI" in output
     assert "Inverse" in output
     assert "Single Default: Discard" in output
     assert "Double Default: Discard" in output
     assert "C(100)-F -> X(100)-F" in output
     assert "C(200)-F -> X(200)-F" in output
+
+    assert "| Filter outer TPID/DEI |" in output
+    assert "| Filter Ethertype |" in output
+    assert "| Treatment tags to remove |" in output
+    assert "| Treatment outer priority |" in output
+
+    assert "TPID:any" in output
+    assert "Copy:Inner" in output
+    assert "Any" in output  # Filter Ethertype = 0
+    assert "| 1 |" in output  # Treatment tags to remove = 1 (single tag)
+    assert "| 3 |" in output  # Treatment tags to remove = 3 (discard)
+    assert "| 100 |" in output  # VID 100
+    assert "| 200 |" in output  # VID 200
 
 
 def test_cmd_tcont_flow_md_output():
