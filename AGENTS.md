@@ -185,6 +185,50 @@ Assume compatibility is required for:
 Any intentional incompatibility must be called out, justified, documented, and
 covered by tests.
 
+## Python Coding Standards
+
+These rules are mandatory for all new Python source files and modified functions.
+
+### File Header
+
+Every newly created Python source file MUST begin with the following header:
+
+```python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (c) 2026 Dong-Yuan Shih <daneshih1125@gmail.com>
+# Licensed under the MIT License.
+# See LICENSE file in the project root for full license information.
+```
+
+Do not omit, modify, or regenerate this header.
+
+When creating a new Python source file, copy this header exactly.
+
+Do not rewrite existing file headers unless explicitly requested.
+
+### Type Hints
+
+All new or modified Python functions MUST use type hints.
+
+Requirements:
+
+- Add type annotations for all function arguments.
+- Add return type annotations.
+- Use built-in generic types (`list`, `dict`, `tuple`, `set`) for Python 3.10+.
+- Prefer `pathlib.Path` over `str` for filesystem paths.
+- Avoid `Any` unless there is a justified reason.
+- Do not refactor unrelated legacy code solely to add type hints.
+
+### Before Completing
+
+Before considering a task complete, verify:
+
+- [ ] Every new Python source file contains the required file header.
+- [ ] All new or modified functions include argument and return type annotations.
+- [ ] Existing copyright and license headers are preserved.
+
 ## Things an AI agent should avoid
 
 - Do not invent or expose unimplemented commands, AI/RAG features, databases,

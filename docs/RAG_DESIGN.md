@@ -51,7 +51,6 @@ A RAG workspace contains:
 - Issue cases (Markdown)
 - Vendor MIB JSON definitions
 - Semantic plugins
-- Profiles
 
 ---
 

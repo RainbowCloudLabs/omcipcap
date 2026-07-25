@@ -8,6 +8,7 @@
 import os
 import argparse
 import json
+from pathlib import Path
 
 from omci import omcimib
 from omci import omcigrapher
@@ -16,6 +17,8 @@ from omci import omcisemantic
 from omci import omcirich
 from omci import omcimd
 from omci import overview
+from omci.ai.rag import initialize_workspace
+from omci.ai.rag.workspace import SUPPORTED_PROFILES, WorkspaceInitError
 from omci.omci import load_omci_packets
 
 
@@ -246,6 +249,22 @@ def main():
         dest="command", help="Available analysis commands"
     )
 
+    # --- Sub-command: ai rag init ---
+    ai_p = subparsers.add_parser("ai", help="AI-assisted analysis commands")
+    ai_subparsers = ai_p.add_subparsers(dest="ai_command")
+    rag_p = ai_subparsers.add_parser("rag", help="RAG workspace commands")
+    rag_subparsers = rag_p.add_subparsers(dest="rag_command")
+    rag_init_p = rag_subparsers.add_parser("init", help="Initialize a RAG workspace")
+    rag_init_p.add_argument(
+        "--profile",
+        required=True,
+        choices=SUPPORTED_PROFILES,
+        help="RAG profile",
+    )
+    rag_init_p.add_argument(
+        "--dir", required=True, dest="workdir", help="RAG workspace directory"
+    )
+
     # --- Sub-command: check ---
     check_p = subparsers.add_parser(
         "check", parents=[common_args], help="Analyze RTT, TID duplicates, and failures"
@@ -357,7 +376,13 @@ def main():
             print(f"[!] Error: PCAP file not found: {getattr(args, 'pcap', 'N/A')}")
             return
 
-    if args.command == "check":
+    if args.command == "ai" and args.ai_command == "rag" and args.rag_command == "init":
+        try:
+            workspace = initialize_workspace(Path(args.workdir), args.profile)
+        except WorkspaceInitError as exc:
+            parser.error(str(exc))
+        print(f"[+] RAG workspace initialized: {workspace}")
+    elif args.command == "check":
         run_omcicheck(
             args.pcap,
             args.only_vendor,
