@@ -15,8 +15,26 @@ from omci import __version__
 
 
 DB_SCHEMA_VERSION = 1
-SUPPORTED_PROFILES = ("standard", "workstation", "server")
+PROFILE_CONFIGS: dict[str, dict[str, object]] = {
+    "standard": {
+        "model": "sentence-transformers/all-MiniLM-L6-v2",
+        "max_tokens": 256,
+        "token_overlap": 32,
+    },
+    "workstation": {
+        "model": "BAAI/bge-m3",
+        "max_tokens": 512,
+        "token_overlap": 64,
+    },
+    "server": {
+        "model": "BAAI/bge-m3",
+        "max_tokens": 512,
+        "token_overlap": 64,
+    },
+}
+SUPPORTED_PROFILES = tuple(PROFILE_CONFIGS)
 WORKSPACE_DIRS = ("db", "issues", "mib-json", "semantics")
+INIT_INSTRUCTION = "omcipcap ai rag init --profile <profile> --dir <workdir>"
 
 
 class WorkspaceInitError(Exception):
@@ -35,16 +53,10 @@ def _read_json(path: Path) -> dict[str, object]:
     return data
 
 
-def _write_json_once(path: Path, data: dict[str, object]) -> None:
-    if path.exists():
-        if _read_json(path) != data:
-            raise WorkspaceInitError(
-                f"Existing file '{path}' is incompatible with the requested workspace"
-            )
-        return
-
-    temp_path = None
+def _write_json_atomic(path: Path, data: dict[str, object]) -> None:
+    temp_path: Path | None = None
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
             "w",
             encoding="utf-8",
@@ -66,19 +78,65 @@ def _write_json_once(path: Path, data: dict[str, object]) -> None:
                 pass
 
 
-def _ensure_config(path: Path, profile: str) -> None:
-    if path.exists():
-        config = _read_json(path)
-        if (
-            config.get("db_schema_version") != DB_SCHEMA_VERSION
-            or config.get("profile_id") != profile
-        ):
+def default_workspace_config_path() -> Path:
+    return Path.home() / ".local" / "omcipcap" / "rag_config.json"
+
+
+def _validate_workspace_metadata(
+    workspace: Path, requested_profile: str | None = None
+) -> dict[str, object]:
+    config_path = workspace / "config.json"
+    if not config_path.is_file():
+        raise WorkspaceInitError(
+            f"RAG workspace metadata is missing: '{config_path}'"
+        )
+
+    config = _read_json(config_path)
+    if config.get("db_schema_version") != DB_SCHEMA_VERSION:
+        raise WorkspaceInitError(
+            f"RAG workspace schema is incompatible; expected version {DB_SCHEMA_VERSION}"
+        )
+
+    profile = config.get("profile_id")
+    if not isinstance(profile, str) or profile not in SUPPORTED_PROFILES:
+        raise WorkspaceInitError(
+            f"RAG workspace profile is unsupported: '{profile}'"
+        )
+    if requested_profile is not None and profile != requested_profile:
+        raise WorkspaceInitError(
+            f"RAG workspace profile '{profile}' conflicts with requested profile "
+            f"'{requested_profile}'"
+        )
+
+    version = config.get("omcipcap_version")
+    created_at = config.get("created_at")
+    if not isinstance(version, str) or not version:
+        raise WorkspaceInitError("RAG workspace metadata has invalid omcipcap_version")
+    if not isinstance(created_at, str) or not created_at:
+        raise WorkspaceInitError("RAG workspace metadata has invalid created_at")
+    try:
+        timestamp = datetime.fromisoformat(created_at)
+    except ValueError as exc:
+        raise WorkspaceInitError(
+            "RAG workspace metadata has invalid created_at"
+        ) from exc
+    if timestamp.utcoffset() != timezone.utc.utcoffset(timestamp):
+        raise WorkspaceInitError("RAG workspace created_at must use UTC")
+
+    for dirname in WORKSPACE_DIRS:
+        if not (workspace / dirname).is_dir():
             raise WorkspaceInitError(
-                f"Existing file '{path}' is incompatible with the requested workspace"
+                f"RAG workspace is incomplete; missing directory: '{dirname}'"
             )
+    return config
+
+
+def _ensure_workspace_metadata(path: Path, profile: str) -> None:
+    if path.exists():
+        _validate_workspace_metadata(path.parent, profile)
         return
 
-    _write_json_once(
+    _write_json_atomic(
         path,
         {
             "db_schema_version": DB_SCHEMA_VERSION,
@@ -89,6 +147,13 @@ def _ensure_config(path: Path, profile: str) -> None:
     )
 
 
+def _write_default_workspace(workspace: Path) -> None:
+    _write_json_atomic(
+        default_workspace_config_path(),
+        {"workspace_path": str(workspace)},
+    )
+
+
 def initialize_workspace(workdir: Path, profile: str) -> Path:
     if profile not in SUPPORTED_PROFILES:
         supported = ", ".join(SUPPORTED_PROFILES)
@@ -96,7 +161,7 @@ def initialize_workspace(workdir: Path, profile: str) -> Path:
             f"Unsupported RAG profile '{profile}'. Supported profiles: {supported}"
         )
 
-    workspace = workdir.expanduser()
+    workspace = workdir.expanduser().resolve()
     try:
         if workspace.exists() and not workspace.is_dir():
             raise WorkspaceInitError(
@@ -110,5 +175,45 @@ def initialize_workspace(workdir: Path, profile: str) -> Path:
             f"Cannot create RAG workspace '{workspace}': {exc}"
         ) from exc
 
-    _ensure_config(workspace / "config.json", profile)
+    _ensure_workspace_metadata(workspace / "config.json", profile)
+    _write_default_workspace(workspace)
     return workspace
+
+
+def resolve_workspace() -> tuple[Path, dict[str, object]]:
+    user_config_path = default_workspace_config_path()
+    if not user_config_path.is_file():
+        raise WorkspaceInitError(
+            f"Default RAG workspace is not configured. Run: {INIT_INSTRUCTION}"
+        )
+
+    try:
+        user_config = _read_json(user_config_path)
+    except WorkspaceInitError as exc:
+        raise WorkspaceInitError(
+            f"Default RAG workspace configuration is invalid. "
+            f"Run: {INIT_INSTRUCTION}. Details: {exc}"
+        ) from exc
+
+    workspace_value = user_config.get("workspace_path")
+    if not isinstance(workspace_value, str) or not workspace_value.strip():
+        raise WorkspaceInitError(
+            f"Default RAG workspace configuration has no valid workspace_path. "
+            f"Run: {INIT_INSTRUCTION}"
+        )
+
+    workspace = Path(workspace_value).expanduser().resolve()
+    if not workspace.is_dir():
+        raise WorkspaceInitError(
+            f"Configured RAG workspace does not exist: '{workspace}'. "
+            f"Run: {INIT_INSTRUCTION}"
+        )
+
+    try:
+        config = _validate_workspace_metadata(workspace)
+    except WorkspaceInitError as exc:
+        raise WorkspaceInitError(
+            f"Configured RAG workspace is invalid: {exc}. "
+            f"Run: {INIT_INSTRUCTION}"
+        ) from exc
+    return workspace, config

@@ -17,6 +17,12 @@ authors = [
     {name = "Dong-Yuan Shih", email = "daneshih1125@gmail.com"}
 ]
 
+[project.optional-dependencies]
+ai = [
+    "chromadb>=1.5,<2.0",
+    "sentence-transformers>=3.0.0",
+]
+
 [project.urls]
 "Homepage" = "https://github.com/daneshih1125/omcipcap"
 "Repository" = "https://github.com/daneshih1125/omcipcap"

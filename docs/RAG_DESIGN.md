@@ -14,6 +14,24 @@ assist troubleshooting.
 - Local-first deployment
 - Profile/database compatibility validation
 
+## Implementation Decisions
+
+The first official implementation of the OMCIPcap RAG subsystem uses
+**ChromaDB** as the vector database.
+
+Reasons:
+
+- Pure Python implementation
+- Local persistent storage
+- Lightweight deployment
+- No external database server required
+- Suitable for workstation and offline environments
+
+Database abstraction is **not** a design goal for the current implementation.
+
+Future support for additional vector databases may be considered, but is
+currently out of scope.
+
 ## Database Compatibility
 
 The RAG database stores metadata describing the indexing configuration used
@@ -51,6 +69,48 @@ A RAG workspace contains:
 - Issue cases (Markdown)
 - Vendor MIB JSON definitions
 - Semantic plugins
+
+The `db/` directory contains the ChromaDB persistent database.
+
+### Default Workspace Configuration
+
+OMCIPcap stores the path of the active RAG workspace in the per-user
+configuration file:
+
+```text
+~/.local/omcipcap/rag_config.json
+```
+
+The configuration file contains only the workspace location:
+
+```json
+{
+  "workspace_path": "/home/user/RAG"
+}
+```
+
+The `rag init` command MUST create or update this file after successfully
+initializing the workspace. The stored path MUST be absolute and normalized.
+
+Subsequent RAG commands, including `ingest`, `query`, `list`, `show`, `status`,
+and `rebuild`, resolve the active workspace from this configuration file. Users
+do not need to provide the workspace directory again for each command.
+
+The per-user configuration file stores only user-level workspace selection.
+Workspace metadata, including the database schema version, profile ID, OMCIPcap
+version, and creation time, remains inside the workspace and MUST NOT be copied
+into `~/.local/omcipcap/rag_config.json`.
+
+If the configuration file is missing, invalid, or references a workspace that
+does not exist, the command MUST fail with a clear message instructing the user
+to run:
+
+```text
+omcipcap ai rag init --profile <profile> --dir <workdir>
+```
+
+The configuration file SHOULD be written atomically to avoid leaving a partial
+or corrupted file.
 
 ---
 
@@ -261,3 +321,180 @@ Each chunk is identified by:
 
 where `chunk_index` is zero-based and scoped to the combination of
 `case_id` and `semantic_unit`.
+
+### Profile Chunk Limits
+
+Each profile MUST define an explicit maximum token count and token overlap for
+semantic chunks.
+
+The initial profile limits are:
+
+| Profile | Maximum Tokens per Chunk | Token Overlap |
+|---------|--------------------------|---------------|
+| standard | 256 | 32 |
+| workstation | 512 | 64 |
+| server | 512 | 64 |
+
+Token counts MUST be calculated using the tokenizer associated with the
+embedding model selected by the active profile.
+
+Character count and whitespace-separated word count MUST NOT be used as
+substitutes for token count.
+
+A semantic unit whose token count is less than or equal to the profile limit is
+stored as one chunk with `chunk_index = 0`.
+
+A semantic unit whose token count exceeds the profile limit MUST be divided
+into multiple chunks:
+
+```text
+<case_id>:<semantic_unit>:0
+<case_id>:<semantic_unit>:1
+<case_id>:<semantic_unit>:2
+```
+Chunk indices MUST be deterministic and zero-based.
+
+Chunking SHOULD prefer the following boundaries, in order:
+
+1. Markdown headings
+2. Paragraph boundaries
+3. List-item boundaries
+4. Line boundaries
+5. Token-level splitting as a final fallback
+
+Adjacent chunks MUST use the overlap configured by the active profile.
+
+The chunker MUST preserve the original document order.
+
+Empty chunks MUST NOT be stored.
+
+### Profile Configuration
+
+Profile settings MUST be defined in one shared configuration structure.
+
+Profile configuration MUST include:
+
+- Embedding model
+- Maximum tokens per chunk
+- Token overlap
+
+Profile settings MUST NOT be duplicated across multiple dictionaries or modules.
+
+Example:
+
+```python
+PROFILE_CONFIGS = {
+    "standard": {
+        "model": "sentence-transformers/all-MiniLM-L6-v2",
+        "max_tokens": 256,
+        "token_overlap": 32,
+    },
+    "workstation": {
+        "model": "BAAI/bge-m3",
+        "max_tokens": 512,
+        "token_overlap": 64,
+    },
+    "server": {
+        "model": "BAAI/bge-m3",
+        "max_tokens": 512,
+        "token_overlap": 64,
+    },
+}
+```
+
+The same profile configuration MUST be reused by:
+
+- `rag init`
+- `rag ingest`
+- `rag status`
+- `rag rebuild`
+
+The ingestion pipeline MUST select the embedding model, token limit, and token
+overlap from the active workspace profile.
+
+The embedding tokenizer associated with the selected profile model MUST be used
+for token counting and token-level splitting.
+
+Character count, whitespace-separated word count, and fixed character slicing
+MUST NOT be used as substitutes for tokenizer-based token counting.
+
+## Issue Case Format
+
+Issue cases are stored as Markdown documents and serve as the primary knowledge
+source for RAG ingestion.
+
+Each issue case MUST contain the following sections:
+
+- Problem
+- Root-Cause
+- Trigger-Condition
+- How-To-Identify
+- Solution
+
+The RAG ingestion pipeline validates the presence of these required sections
+before indexing. Missing required sections SHALL result in an ingestion error.
+
+Additional sections are permitted and are preserved during indexing.
+
+### Environment (Optional)
+
+The following environment information is recommended when available to improve
+retrieval accuracy and assist issue classification:
+
+- ONU Vendor
+- ONU Firmware
+- OLT Vendor
+- OLT Firmware
+
+Additional environment fields may also be included when relevant, such as
+software version, hardware revision, deployment mode, or other vendor-specific
+information.
+
+Environment information is optional and is not required for successful
+ingestion.
+
+## Optional AI Dependencies
+
+The `omcipcap ai` command group is an optional feature.
+
+AI-related dependencies (embedding models, vector databases, LLM SDKs, etc.)
+are **not** part of the core `omcipcap` installation.
+
+The project SHALL provide AI functionality through Python optional
+dependencies defined in `pyproject.toml`.
+
+Example:
+
+```toml
+[project.optional-dependencies]
+ai = [
+    "chromadb>=1.5,<2.0",
+    "sentence-transformers>=3.0.0",
+]
+```
+
+Users who require AI features should install:
+
+```bash
+pip install "omcipcap[ai]"
+```
+
+This design keeps the core package lightweight and avoids installing large AI
+dependencies for users who only require OMCI analysis.
+
+## Binary Distribution
+
+Official standalone binaries for:
+
+- Windows
+- Linux
+- macOS
+
+contain only the core `omcipcap` functionality.
+
+The `omcipcap ai` command group is **not included** in binary releases because
+AI functionality depends on optional Python packages that are installed
+separately.
+
+Users requiring AI features should install the Python package with the `ai`
+optional dependency instead.

@@ -17,7 +17,7 @@ from omci import omcisemantic
 from omci import omcirich
 from omci import omcimd
 from omci import overview
-from omci.ai.rag import initialize_workspace
+from omci.ai.rag import RAGIngestError, ingest_case, initialize_workspace
 from omci.ai.rag.workspace import SUPPORTED_PROFILES, WorkspaceInitError
 from omci.omci import load_omci_packets
 
@@ -231,7 +231,7 @@ def args_load_json_semantic(args):
     return True
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         prog="omcipcap", description="OMCI PCAP Diagnostic & Analysis Tool"
     )
@@ -264,6 +264,14 @@ def main():
     rag_init_p.add_argument(
         "--dir", required=True, dest="workdir", help="RAG workspace directory"
     )
+    rag_ingest_p = rag_subparsers.add_parser(
+        "ingest", help="Ingest an issue case into the RAG workspace"
+    )
+    rag_ingest_p.add_argument("--case-id", required=True, help="Issue case identifier")
+    rag_ingest_p.add_argument(
+        "--issue-md", required=True, help="Issue Markdown file"
+    )
+    rag_ingest_p.add_argument("pcap", help="Path to pcap file")
 
     # --- Sub-command: check ---
     check_p = subparsers.add_parser(
@@ -381,7 +389,22 @@ def main():
             workspace = initialize_workspace(Path(args.workdir), args.profile)
         except WorkspaceInitError as exc:
             parser.error(str(exc))
-        print(f"[+] RAG workspace initialized: {workspace}")
+        print(f"[+] RAG workspace initialized: {workspace} (profile: {args.profile})")
+    elif (
+        args.command == "ai"
+        and args.ai_command == "rag"
+        and args.rag_command == "ingest"
+    ):
+        try:
+            ingested = ingest_case(
+                args.case_id,
+                Path(args.issue_md),
+                Path(args.pcap),
+            )
+        except RAGIngestError as exc:
+            parser.error(str(exc))
+        if ingested:
+            print(f'[+] RAG case ingested: "{args.case_id}"')
     elif args.command == "check":
         run_omcicheck(
             args.pcap,

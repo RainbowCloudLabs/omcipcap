@@ -7,6 +7,12 @@
 
 """RAG workspace support."""
 
-from omci.ai.rag.workspace import initialize_workspace
+from omci.ai.rag.ingest import RAGIngestError, ingest_case
+from omci.ai.rag.workspace import initialize_workspace, resolve_workspace
 
-__all__ = ["initialize_workspace"]
+__all__ = [
+    "RAGIngestError",
+    "ingest_case",
+    "initialize_workspace",
+    "resolve_workspace",
+]

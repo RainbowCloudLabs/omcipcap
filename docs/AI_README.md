@@ -31,6 +31,31 @@ rag-workspace/
 
 Running the same initialization command again is safe when the existing schema
 and profile are compatible. It preserves the original configuration, including
-the workspace creation timestamp.
+the workspace creation timestamp. Initialization also records the normalized
+workspace path in `~/.local/omcipcap/rag_config.json`.
 
-RAG ingest and query commands are not implemented yet.
+## Ingest an issue case
+
+Ingestion resolves the active workspace from the per-user configuration:
+
+```text
+omcipcap ai rag ingest \
+    --case-id CASE-001 \
+    --issue-md issue.md \
+    sample.pcap
+```
+
+The issue document must contain non-empty level-2 `Problem`, `Root-Cause`,
+`Trigger-Condition`, `How-To-Identify`, and `Solution` sections. `Environment`
+and additional sections are optional. The stored issue is written to
+`issues/<case-id>.md`, and its semantic chunks are stored in ChromaDB under
+`db/`. Semantic units are split with the selected embedding model's tokenizer
+using the token limit and overlap configured by the active profile.
+
+Install the optional AI dependencies before ingestion:
+
+```text
+pip install "omcipcap[ai]"
+```
+
+RAG query, rebuild, list, and show commands are not implemented yet.
