@@ -401,7 +401,7 @@ def render_diff_md(diff_data):
     return "\n".join(parts).rstrip() + "\n"
 
 
-def render_mibdb_md(mib_data):
+def render_mibdb_md(mib_data, short=False):
     """
     Schema from omciparser.get_mib_db_data():
 
@@ -440,6 +440,9 @@ def render_mibdb_md(mib_data):
         )
     )
 
+    if short:
+        return "\n".join(parts).rstrip() + "\n"
+
     for cid in sorted(mib_data.keys(), key=lambda x: int(x)):
         item = mib_data[cid]
         me_name = item.get("me_name", "")
@@ -474,7 +477,7 @@ def render_mibdb_md(mib_data):
     return "\n".join(parts).rstrip() + "\n"
 
 
-def render_tcont_flow_md(flow_data):
+def render_tcont_flow_md(flow_data, short=False):
     """
     Schema from omciflow.get_tcont_flow_data():
 
@@ -515,83 +518,87 @@ def render_tcont_flow_md(flow_data):
         1 for tcont in flow_data if not (tcont.get("gem_ports", []) or [])
     )
 
-    parts.append(
-        render_section(
-            "T-CONT Flow Statistics",
-            render_markdown_table(
-                ["Metric", "Value"],
-                [
-                    ["Total T-CONTs", total_tcont],
-                    ["Bound T-CONTs", bound_tcont],
-                    ["Empty T-CONTs", empty_tcont],
-                    ["Total GEM Ports", total_gem],
-                ],
-            ),
-        )
-    )
-
-    summary_rows = []
-    for tcont in flow_data:
-        tcont_id = tcont.get("tcont_id", "")
-        alloc_id = tcont.get("alloc_id", "")
-        gem_ports = tcont.get("gem_ports", []) or []
-
-        if not gem_ports:
-            summary_rows.append(
-                [
-                    tcont_id,
-                    alloc_id if alloc_id is not None else "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                ]
+    if not short:
+        parts.append(
+            render_section(
+                "T-CONT Flow Statistics",
+                render_markdown_table(
+                    ["Metric", "Value"],
+                    [
+                        ["Total T-CONTs", total_tcont],
+                        ["Bound T-CONTs", bound_tcont],
+                        ["Empty T-CONTs", empty_tcont],
+                        ["Total GEM Ports", total_gem],
+                    ],
+                ),
             )
-            continue
-
-        for gem in gem_ports:
-            upstream = gem.get("upstream", {}) or {}
-            downstream = gem.get("downstream", {}) or {}
-
-            summary_rows.append(
-                [
-                    tcont_id,
-                    alloc_id if alloc_id is not None else "",
-                    gem.get("gem_port_id", ""),
-                    upstream.get("pq_ptr", ""),
-                    upstream.get("bandwidth", ""),
-                    downstream.get("pq_ptr", ""),
-                    downstream.get("priority", ""),
-                    downstream.get("bandwidth", ""),
-                ]
-            )
-
-    parts.append(
-        render_section(
-            "T-CONT / GEM Flow Summary",
-            render_markdown_table(
-                [
-                    "T-CONT ID",
-                    "Alloc-ID",
-                    "GEM Port ID",
-                    "US PQ Ptr",
-                    "US Bandwidth",
-                    "DS PQ Ptr",
-                    "DS Priority",
-                    "DS Bandwidth",
-                ],
-                summary_rows,
-            ),
         )
-    )
+
+        summary_rows = []
+        for tcont in flow_data:
+            tcont_id = tcont.get("tcont_id", "")
+            alloc_id = tcont.get("alloc_id", "")
+            gem_ports = tcont.get("gem_ports", []) or []
+
+            if not gem_ports:
+                summary_rows.append(
+                    [
+                        tcont_id,
+                        alloc_id if alloc_id is not None else "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                    ]
+                )
+                continue
+
+            for gem in gem_ports:
+                upstream = gem.get("upstream", {}) or {}
+                downstream = gem.get("downstream", {}) or {}
+
+                summary_rows.append(
+                    [
+                        tcont_id,
+                        alloc_id if alloc_id is not None else "",
+                        gem.get("gem_port_id", ""),
+                        upstream.get("pq_ptr", ""),
+                        upstream.get("bandwidth", ""),
+                        downstream.get("pq_ptr", ""),
+                        downstream.get("priority", ""),
+                        downstream.get("bandwidth", ""),
+                    ]
+                )
+
+        parts.append(
+            render_section(
+                "T-CONT / GEM Flow Summary",
+                render_markdown_table(
+                    [
+                        "T-CONT ID",
+                        "Alloc-ID",
+                        "GEM Port ID",
+                        "US PQ Ptr",
+                        "US Bandwidth",
+                        "DS PQ Ptr",
+                        "DS Priority",
+                        "DS Bandwidth",
+                    ],
+                    summary_rows,
+                ),
+            )
+        )
 
     tree_lines = []
     for tcont in flow_data:
         tcont_id = tcont.get("tcont_id", "")
         alloc_id = tcont.get("alloc_id", None)
         gem_ports = tcont.get("gem_ports", []) or []
+
+        if short and alloc_id is None:
+            continue
 
         alloc_text = "Unassigned" if alloc_id is None else alloc_id
         tree_lines.append(f"- T-CONT {tcont_id} (Alloc-ID: {alloc_text})")
