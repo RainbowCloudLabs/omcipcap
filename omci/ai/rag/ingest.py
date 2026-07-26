@@ -9,11 +9,13 @@ import re
 import tempfile
 from pathlib import Path
 
-from omci import omcimd, omciparser
+from omci import omcimd, omciparser, omcisemantic
 from omci.ai.rag.workspace import (
     DB_SCHEMA_VERSION,
     PROFILE_CONFIGS,
     WorkspaceInitError,
+    _load_ai_dependencies as _load_workspace_ai_dependencies,
+    load_embedding_model,
     resolve_workspace,
 )
 from omci.omci import load_omci_packets
@@ -226,15 +228,40 @@ def build_chunk_records(
 
 def _load_ai_dependencies() -> tuple[object, object]:
     try:
-        import chromadb
-        from sentence_transformers import SentenceTransformer
-    except ImportError as exc:
+        return _load_workspace_ai_dependencies()
+    except WorkspaceInitError as exc:
+        raise RAGIngestError(str(exc)) from exc
+
+
+def _load_workspace_analysis_resources(workspace: Path) -> None:
+    from omci.cli import load_mib_json
+
+    mib_json_dir = workspace / "mib-json"
+    mib_json_files = sorted(
+        (
+            path
+            for path in mib_json_dir.iterdir()
+            if path.is_file() and path.suffix == ".json"
+        ),
+        key=lambda path: path.name,
+    )
+    for mib_json_path in mib_json_files:
+        if not load_mib_json(str(mib_json_path)):
+            raise RAGIngestError(
+                f"Failed to load workspace MIB JSON: '{mib_json_path}'"
+            )
+
+    semantics_dir = workspace / "semantics"
+    try:
+        loaded = omcisemantic.load_external_semantics(str(semantics_dir))
+    except Exception as exc:
         raise RAGIngestError(
-            "AI dependencies are not installed.\n\n"
-            "Install them with:\n\n"
-            '    pip install "omcipcap[ai]"'
+            f"Failed to load semantic plugins from '{semantics_dir}': {exc}"
         ) from exc
-    return chromadb, SentenceTransformer
+    if not loaded:
+        raise RAGIngestError(
+            f"Failed to load semantic plugins from '{semantics_dir}'"
+        )
 
 
 def _analyze_pcap(pcap_path: Path, issue_text: str) -> dict[str, str]:
@@ -383,7 +410,8 @@ def ingest_case(
         raise RAGIngestError(f"Cannot read issue Markdown '{issue_path}': {exc}") from exc
     validate_issue_markdown(issue_text)
 
-    chromadb_module, sentence_transformer = _load_ai_dependencies()
+    _load_workspace_analysis_resources(workspace)
+    chromadb_module, _ = _load_ai_dependencies()
     collection = _collection_for_workspace(chromadb_module, workspace, config)
     try:
         previous = _existing_case(collection, case_id)
@@ -405,7 +433,14 @@ def ingest_case(
     profile = str(config["profile_id"])
     profile_config = PROFILE_CONFIGS[profile]
     try:
-        model = sentence_transformer(str(profile_config["model"]))
+        model = load_embedding_model(profile, local_files_only=True)
+    except WorkspaceInitError as exc:
+        raise RAGIngestError(
+            f"Embedding model for profile '{profile}' is not available locally.\n\n"
+            "Run:\n\n"
+            f"    omcipcap ai rag init --profile {profile} --dir {workspace}"
+        ) from exc
+    try:
         ids, documents, metadatas = build_chunk_records(
             case_id,
             semantic_units,

@@ -20,9 +20,19 @@ from omci.ai.rag.workspace import (
     initialize_workspace,
     resolve_workspace,
 )
+from omci.cli import main
 
 
 EXPECTED_DIRS = {"db", "issues", "mib-json", "semantics"}
+REAL_PREPARE_EMBEDDING_MODEL = rag_workspace.prepare_embedding_model
+
+
+@pytest.fixture(autouse=True)
+def avoid_model_download(monkeypatch: pytest.MonkeyPatch) -> None:
+    def prepare_model(profile: str) -> object:
+        return {"profile": profile}
+
+    monkeypatch.setattr(rag_workspace, "prepare_embedding_model", prepare_model)
 
 
 def configure_test_home(
@@ -161,6 +171,203 @@ def test_rag_init_rejects_non_directory_path(
 
     with pytest.raises(WorkspaceInitError, match="not a directory"):
         initialize_workspace(workspace, "standard")
+
+
+def test_rag_init_prepares_selected_profile_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure_test_home(tmp_path, monkeypatch)
+    prepared_profiles: list[str] = []
+
+    def prepare_model(profile: str) -> object:
+        prepared_profiles.append(profile)
+        return {"tokenizer": object()}
+
+    monkeypatch.setattr(rag_workspace, "prepare_embedding_model", prepare_model)
+
+    workspace = initialize_workspace(tmp_path / "RAG", "workstation")
+
+    assert prepared_profiles == ["workstation"]
+    assert (workspace / "config.json").is_file()
+    assert default_workspace_config_path().is_file()
+
+
+def test_prepare_embedding_model_uses_online_cache_mode_and_tokenizer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_loads: list[tuple[str, bool]] = []
+
+    class FakeModel:
+        def __init__(self) -> None:
+            self.tokenizer = object()
+
+    def sentence_transformer(
+        model_name: str, local_files_only: bool
+    ) -> FakeModel:
+        model_loads.append((model_name, local_files_only))
+        return FakeModel()
+
+    def load_dependencies() -> tuple[object, object]:
+        return object(), sentence_transformer
+
+    monkeypatch.setattr(
+        rag_workspace,
+        "prepare_embedding_model",
+        REAL_PREPARE_EMBEDDING_MODEL,
+    )
+    monkeypatch.setattr(rag_workspace, "_load_ai_dependencies", load_dependencies)
+
+    first = rag_workspace.prepare_embedding_model("standard")
+    second = rag_workspace.prepare_embedding_model("standard")
+
+    assert first.tokenizer is not None
+    assert second.tokenizer is not None
+    assert model_loads == [
+        ("sentence-transformers/all-MiniLM-L6-v2", False),
+        ("sentence-transformers/all-MiniLM-L6-v2", False),
+    ]
+
+
+def test_prepare_embedding_model_reuses_sentence_transformers_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cache_available = False
+    downloads = 0
+
+    class FakeModel:
+        def __init__(self) -> None:
+            self.tokenizer = object()
+
+    def sentence_transformer(
+        model_name: str, local_files_only: bool
+    ) -> FakeModel:
+        nonlocal cache_available, downloads
+        assert model_name == "sentence-transformers/all-MiniLM-L6-v2"
+        assert not local_files_only
+        if not cache_available:
+            downloads += 1
+            cache_available = True
+        return FakeModel()
+
+    def load_dependencies() -> tuple[object, object]:
+        return object(), sentence_transformer
+
+    monkeypatch.setattr(
+        rag_workspace,
+        "prepare_embedding_model",
+        REAL_PREPARE_EMBEDDING_MODEL,
+    )
+    monkeypatch.setattr(rag_workspace, "_load_ai_dependencies", load_dependencies)
+
+    rag_workspace.prepare_embedding_model("standard")
+    rag_workspace.prepare_embedding_model("standard")
+
+    assert downloads == 1
+
+
+def test_shared_model_loader_supports_strict_local_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_loads: list[tuple[str, bool]] = []
+
+    class FakeModel:
+        def __init__(self) -> None:
+            self.tokenizer = object()
+
+    def sentence_transformer(
+        model_name: str, local_files_only: bool
+    ) -> FakeModel:
+        model_loads.append((model_name, local_files_only))
+        return FakeModel()
+
+    def load_dependencies() -> tuple[object, object]:
+        return object(), sentence_transformer
+
+    monkeypatch.setattr(rag_workspace, "_load_ai_dependencies", load_dependencies)
+
+    model = rag_workspace.load_embedding_model(
+        "workstation",
+        local_files_only=True,
+    )
+
+    assert model.tokenizer is not None
+    assert model_loads == [("BAAI/bge-m3", True)]
+
+
+def test_rag_init_prints_success_only_after_model_is_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_test_home(tmp_path, monkeypatch)
+    workspace = tmp_path / "RAG"
+    events: list[str] = []
+
+    def prepare_model(profile: str) -> object:
+        assert profile == "workstation"
+        assert "RAG workspace initialized" not in capsys.readouterr().out
+        events.append("model-ready")
+        return {"tokenizer": object()}
+
+    monkeypatch.setattr(rag_workspace, "prepare_embedding_model", prepare_model)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "omcipcap",
+            "ai",
+            "rag",
+            "init",
+            "--profile",
+            "workstation",
+            "--dir",
+            str(workspace),
+        ],
+    )
+
+    main()
+    events.append("command-returned")
+
+    assert events == ["model-ready", "command-returned"]
+    assert "RAG workspace initialized" in capsys.readouterr().out
+
+
+def test_rag_init_model_failure_rolls_back_new_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure_test_home(tmp_path, monkeypatch)
+    workspace = tmp_path / "RAG"
+
+    def fail_preparation(profile: str) -> object:
+        raise WorkspaceInitError(f"model preparation failed for {profile}")
+
+    monkeypatch.setattr(rag_workspace, "prepare_embedding_model", fail_preparation)
+
+    with pytest.raises(WorkspaceInitError, match="model preparation failed"):
+        initialize_workspace(workspace, "server")
+
+    assert not (workspace / "config.json").exists()
+    assert not default_workspace_config_path().exists()
+
+
+def test_rag_init_model_failure_restores_previous_default_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure_test_home(tmp_path, monkeypatch)
+    first = initialize_workspace(tmp_path / "first", "standard")
+    original_default = default_workspace_config_path().read_bytes()
+    second = tmp_path / "second"
+
+    def fail_preparation(profile: str) -> object:
+        raise WorkspaceInitError(f"model preparation failed for {profile}")
+
+    monkeypatch.setattr(rag_workspace, "prepare_embedding_model", fail_preparation)
+
+    with pytest.raises(WorkspaceInitError, match="model preparation failed"):
+        initialize_workspace(second, "workstation")
+
+    assert first.is_dir()
+    assert default_workspace_config_path().read_bytes() == original_default
+    assert not (second / "config.json").exists()
 
 
 def test_resolve_valid_default_workspace(

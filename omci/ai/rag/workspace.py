@@ -41,6 +41,44 @@ class WorkspaceInitError(Exception):
     """Raised when a RAG workspace cannot be initialized."""
 
 
+def _load_ai_dependencies() -> tuple[object, object]:
+    try:
+        import chromadb
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise WorkspaceInitError(
+            "AI dependencies are not installed.\n\n"
+            "Install them with:\n\n"
+            '    pip install "omcipcap[ai]"'
+        ) from exc
+    return chromadb, SentenceTransformer
+
+
+def load_embedding_model(profile: str, local_files_only: bool) -> object:
+    profile_config = PROFILE_CONFIGS[profile]
+    model_name = str(profile_config["model"])
+    _, sentence_transformer = _load_ai_dependencies()
+    try:
+        model = sentence_transformer(
+            model_name,
+            local_files_only=local_files_only,
+        )
+    except Exception as exc:
+        loading_mode = "from the local cache" if local_files_only else "for use"
+        raise WorkspaceInitError(
+            f"Failed to load embedding model '{model_name}' {loading_mode}: {exc}"
+        ) from exc
+    if getattr(model, "tokenizer", None) is None:
+        raise WorkspaceInitError(
+            f"Failed to load embedding model '{model_name}': tokenizer unavailable"
+        )
+    return model
+
+
+def prepare_embedding_model(profile: str) -> object:
+    return load_embedding_model(profile, local_files_only=False)
+
+
 def _read_json(path: Path) -> dict[str, object]:
     try:
         with path.open("r", encoding="utf-8") as f:
@@ -70,6 +108,36 @@ def _write_json_atomic(path: Path, data: dict[str, object]) -> None:
         os.replace(temp_path, path)
     except OSError as exc:
         raise WorkspaceInitError(f"Cannot write file '{path}': {exc}") from exc
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _restore_file_atomic(path: Path, previous: bytes | None) -> None:
+    if previous is None:
+        try:
+            path.unlink()
+        except (FileNotFoundError, NotADirectoryError):
+            pass
+        return
+
+    temp_path: Path | None = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "wb",
+            dir=path.parent,
+            prefix=f".{path.name}.restore.",
+            delete=False,
+        ) as f:
+            temp_path = Path(f.name)
+            f.write(previous)
+        os.replace(temp_path, path)
+    except OSError as exc:
+        raise WorkspaceInitError(f"Cannot restore file '{path}': {exc}") from exc
     finally:
         if temp_path is not None:
             try:
@@ -162,6 +230,14 @@ def initialize_workspace(workdir: Path, profile: str) -> Path:
         )
 
     workspace = workdir.expanduser().resolve()
+    workspace_config_path = workspace / "config.json"
+    default_config_path = default_workspace_config_path()
+    previous_workspace_config = (
+        workspace_config_path.read_bytes() if workspace_config_path.is_file() else None
+    )
+    previous_default_config = (
+        default_config_path.read_bytes() if default_config_path.is_file() else None
+    )
     try:
         if workspace.exists() and not workspace.is_dir():
             raise WorkspaceInitError(
@@ -170,13 +246,23 @@ def initialize_workspace(workdir: Path, profile: str) -> Path:
         workspace.mkdir(parents=True, exist_ok=True)
         for dirname in WORKSPACE_DIRS:
             (workspace / dirname).mkdir(exist_ok=True)
-    except OSError as exc:
+        _ensure_workspace_metadata(workspace_config_path, profile)
+        _write_default_workspace(workspace)
+        prepare_embedding_model(profile)
+    except (OSError, WorkspaceInitError) as exc:
+        try:
+            _restore_file_atomic(workspace_config_path, previous_workspace_config)
+            _restore_file_atomic(default_config_path, previous_default_config)
+        except WorkspaceInitError as restore_exc:
+            raise WorkspaceInitError(
+                f"RAG initialization failed and configuration rollback failed: "
+                f"{restore_exc}"
+            ) from restore_exc
+        if isinstance(exc, WorkspaceInitError):
+            raise
         raise WorkspaceInitError(
             f"Cannot create RAG workspace '{workspace}': {exc}"
         ) from exc
-
-    _ensure_workspace_metadata(workspace / "config.json", profile)
-    _write_default_workspace(workspace)
     return workspace
 
 

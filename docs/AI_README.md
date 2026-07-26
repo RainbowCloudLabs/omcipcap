@@ -32,7 +32,11 @@ rag-workspace/
 Running the same initialization command again is safe when the existing schema
 and profile are compatible. It preserves the original configuration, including
 the workspace creation timestamp. Initialization also records the normalized
-workspace path in `~/.local/omcipcap/rag_config.json`.
+workspace path in `~/.local/omcipcap/rag_config.json`. Before reporting
+success, initialization prepares the selected embedding model and tokenizer in
+the normal sentence-transformers cache; model files are not copied into the
+workspace. Initialization permits downloading a missing model and does not
+report success until model loading completes.
 
 ## Ingest an issue case
 
@@ -50,7 +54,12 @@ The issue document must contain non-empty level-2 `Problem`, `Root-Cause`,
 and additional sections are optional. The stored issue is written to
 `issues/<case-id>.md`, and its semantic chunks are stored in ChromaDB under
 `db/`. Semantic units are split with the selected embedding model's tokenizer
-using the token limit and overlap configured by the active profile.
+using the token limit and overlap configured by the active profile. Before
+capture analysis, ingestion loads top-level `.json` definitions from
+`mib-json/` and semantic plugins from `semantics/`. Ingestion loads the
+embedding model with `local_files_only=True`; it never downloads the model or
+checks the Hugging Face Hub for updates. If the cached model is missing, rerun
+`rag init` for the active profile and workspace.
 
 Install the optional AI dependencies before ingestion:
 

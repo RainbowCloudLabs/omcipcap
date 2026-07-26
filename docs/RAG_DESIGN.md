@@ -61,16 +61,121 @@ The schema document defines:
 All RAG implementations must follow the latest schema defined in
 `RAG_DB_SCHEMA.md`.
 
+## Related Specifications
+
+The RAG subsystem is specified by the following documents:
+
+- `RAG_CLI.md`
+- `RAG_DB_SCHEMA.md`
+
+This document describes the overall architecture and design goals.
+Command-line behavior is defined in `RAG_CLI.md`.
+Database persistence is defined in `RAG_DB_SCHEMA.md`.
+
 ## Workspace Layout
 
 A RAG workspace contains:
 
-- RAG database
-- Issue cases (Markdown)
-- Vendor MIB JSON definitions
-- Semantic plugins
+```text
+<workspace>/
+├── db/
+├── cases/
+├── mib-json/
+├── semantics/
+└── workspace.json
+```
 
-The `db/` directory contains the ChromaDB persistent database.
+- `db/` contains the persistent ChromaDB database.
+- `cases/` contains stored issue-case Markdown documents and source artifacts.
+- `mib-json/` contains vendor-specific MIB JSON definitions.
+- `semantics/` contains Python semantic plugins used by OMCI analysis.
+- `workspace.json` contains workspace metadata.
+
+The `mib-json/` and `semantics/` directories MUST be created by `rag init`,
+even when they are initially empty.
+
+### Workspace Analysis Resources
+
+The RAG ingestion pipeline MUST use analysis resources stored in the active
+workspace.
+
+For every `rag ingest` operation, the implementation MUST:
+
+1. Resolve the active workspace.
+2. Discover vendor MIB JSON files from `<workspace>/mib-json/`.
+3. Discover Python semantic plugins from `<workspace>/semantics/`.
+4. Pass the discovered resources to the OMCI analysis pipeline.
+5. Generate semantic units from the enriched analysis result.
+6. Chunk, embed, and store those semantic units.
+
+Workspace analysis resources MUST be applied before semantic units are
+generated.
+
+The ingestion pipeline MUST NOT generate RAG chunks from the base PCAP analysis
+and then attempt to apply vendor MIB definitions or semantic plugins afterward.
+
+### Compatibility with Existing MIB Analysis
+
+RAG ingestion MUST reuse the existing OMCIPcap MIB analysis behavior.
+
+The workspace analysis resources:
+
+```text
+<workspace>/mib-json/
+<workspace>/semantics/
+```
+
+are the workspace equivalents of the existing `mibdb` options:
+
+```text
+--mib-json <file>
+--semantic-dir <directory>
+```
+
+For example, the existing command:
+
+```bash
+omcipcap mibdb --only-vendor sample.pcap \
+    --mib-json vendor.json \
+    --semantic-dir semantics/
+```
+
+and RAG ingestion using equivalent workspace resources SHOULD produce
+consistent vendor-specific MIB identification and semantic analysis results.
+
+Workspace MIB definitions and semantic plugins MUST be applied before RAG
+semantic units are generated.
+
+The required analysis order is:
+
+```text
+PCAP input
+    ↓
+Load workspace vendor MIB definitions
+    ↓
+Load workspace semantic plugins
+    ↓
+Run the existing OMCIPcap MIB analysis pipeline
+    ↓
+Generate RAG semantic units
+    ↓
+Chunk and embed
+    ↓
+Store in the vector database
+```
+
+The RAG implementation MUST reuse the shared internal loaders and analysis APIs
+used by the existing `mibdb` command.
+
+The RAG implementation MUST NOT duplicate the existing:
+
+- OMCI MIB parsing logic
+- vendor MIB JSON loading logic
+- semantic plugin discovery or loading logic
+- vendor-specific MIB identification logic
+
+Detailed discovery rules and command behavior are defined in `RAG_CLI.md`.
+Global command architecture and CLI conventions are defined in `CLI_DESIGN.md`.
 
 ### Default Workspace Configuration
 
@@ -111,79 +216,6 @@ omcipcap ai rag init --profile <profile> --dir <workdir>
 
 The configuration file SHOULD be written atomically to avoid leaving a partial
 or corrupted file.
-
----
-
-## Target CLI
-
-### Initialize
-
-```text
-omcipcap ai rag init --profile standard --dir <workdir>
-```
-
-### Data Management
-
-```text
-# ingest issue
-omcipcap ai rag ingest \
-    --case-id CASE-001 \
-    --issue-md issue.md \
-    sample.pcap
-
-# query issues using a natural-language question
-omcipcap ai rag query "ONU cannot create VEIP" --top-k 5
-
-# list all cases
-omcipcap ai rag list
-
-# show one issue case
-omcipcap ai rag show CASE-001
-```
-
-When ingesting an existing `case-id`, OMCIPcap must prompt before replacing
-the existing case.
-
-Example:
-
-```text
-Case "CASE-001" already exists.
-
-Replace existing case? [y/N]
-```
-
-Selecting **Y** replaces the stored issue case and rebuilds its associated
-semantic chunks.
-
-Selecting **N** cancels the operation.
-
-## Profile Management
-
-```text
-# show workspace status
-omcipcap ai rag status
-
-# rebuild database
-omcipcap ai rag rebuild
-
-# list available profiles
-omcipcap ai rag profile list
-
-# show profile information
-omcipcap ai rag profile show <profile>
-```
-
-The `status` command reports:
-
-- Workspace path
-- Active profile
-- Database status
-- Profile/database compatibility
-- Rebuild requirement
-- Number of indexed issue cases
-
-The `rebuild` command recreates the vector database from the stored issue
-cases using the active profile.
 
 ---
 
@@ -278,6 +310,28 @@ Typical profile mappings include:
 
 The concrete embedding model may change in future revisions without changing
 the CLI or user workflow.
+
+### Embedding Model Preparation
+
+Embedding models are prepared during workspace initialization rather than
+during ingestion.
+
+Each profile specifies a single embedding model.
+
+The implementation MUST prepare that model during `rag init`.
+
+Preparing a model means ensuring that:
+
+- the model can be loaded successfully by SentenceTransformer
+- tokenizer files are available
+- model weights are available
+- subsequent `rag ingest` commands do not trigger model downloads
+
+The implementation MAY reuse the existing sentence-transformers cache.
+
+The implementation MUST NOT copy embedding models into the RAG workspace.
+
+The RAG workspace contains only indexed data and workspace metadata.
 
 ## Chunking Strategy
 

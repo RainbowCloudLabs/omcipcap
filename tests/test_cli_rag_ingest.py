@@ -20,7 +20,12 @@ from omci.ai.rag.ingest import (
     split_semantic_unit,
     validate_issue_markdown,
 )
-from omci.ai.rag.workspace import PROFILE_CONFIGS, initialize_workspace
+from omci.ai.rag import workspace as rag_workspace
+from omci.ai.rag.workspace import (
+    PROFILE_CONFIGS,
+    WorkspaceInitError,
+    initialize_workspace,
+)
 
 
 def issue_markdown(include_environment: bool = True) -> str:
@@ -34,6 +39,14 @@ def issue_markdown(include_environment: bool = True) -> str:
         "## Solution\nCorrect the VLAN rule.\n\n"
         "## Notes\nPreserve this additional section.\n"
     )
+
+
+@pytest.fixture(autouse=True)
+def avoid_model_download(monkeypatch: pytest.MonkeyPatch) -> None:
+    def prepare_model(profile: str) -> object:
+        return {"profile": profile}
+
+    monkeypatch.setattr(rag_workspace, "prepare_embedding_model", prepare_model)
 
 
 def semantic_units(issue_text: str) -> dict[str, str]:
@@ -187,12 +200,24 @@ def prepare_ingest(
     def load_dependencies() -> tuple[object, object]:
         return chroma, FakeSentenceTransformer
 
+    def load_model(profile: str, local_files_only: bool) -> FakeModel:
+        assert profile == "standard"
+        assert local_files_only
+        return FakeModel()
+
     def analyze(path: Path, issue_text: str) -> dict[str, str]:
         assert path == pcap_path
         return semantic_units(issue_text)
 
+    def load_resources(path: Path) -> None:
+        assert path == workspace
+
     monkeypatch.setattr(rag_ingest, "_load_ai_dependencies", load_dependencies)
+    monkeypatch.setattr(rag_ingest, "load_embedding_model", load_model)
     monkeypatch.setattr(rag_ingest, "_analyze_pcap", analyze)
+    monkeypatch.setattr(
+        rag_ingest, "_load_workspace_analysis_resources", load_resources
+    )
     return workspace, issue_path, pcap_path, collection, chroma
 
 
@@ -218,6 +243,240 @@ def test_successful_ingestion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
             "issue_file": "CASE-001.md",
             "pcap_file": "sample.pcap",
         }
+
+
+def test_ingest_loads_shared_profile_model_from_local_cache_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, issue_path, pcap_path, _, _ = prepare_ingest(tmp_path, monkeypatch)
+    model_loads: list[tuple[str, bool, str]] = []
+
+    def load_model(profile: str, local_files_only: bool) -> FakeModel:
+        model_loads.append(
+            (
+                profile,
+                local_files_only,
+                str(PROFILE_CONFIGS[profile]["model"]),
+            )
+        )
+        return FakeModel()
+
+    monkeypatch.setattr(rag_ingest, "load_embedding_model", load_model)
+
+    assert ingest_case("CASE-001", issue_path, pcap_path)
+
+    assert model_loads == [
+        (
+            "standard",
+            True,
+            "sentence-transformers/all-MiniLM-L6-v2",
+        )
+    ]
+    assert (workspace / "issues" / "CASE-001.md").is_file()
+
+
+def test_ingest_local_model_failure_preserves_existing_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, issue_path, pcap_path, collection, _ = prepare_ingest(
+        tmp_path, monkeypatch
+    )
+    old_id = make_chunk_id("CASE-001", "issue_summary", 0)
+    old_metadata = {
+        "case_id": "CASE-001",
+        "semantic_unit": "issue_summary",
+        "chunk_index": 0,
+        "issue_file": "CASE-001.md",
+        "pcap_file": "old.pcap",
+    }
+    collection.records[old_id] = {
+        "document": "old document",
+        "metadata": old_metadata,
+        "embedding": [1.0],
+    }
+    stored_issue = workspace / "issues" / "CASE-001.md"
+    stored_issue.write_text("old issue", encoding="utf-8")
+
+    def confirm_replace(prompt: str) -> str:
+        assert prompt == "Replace existing case? [y/N] "
+        return "y"
+
+    def fail_local_load(profile: str, local_files_only: bool) -> object:
+        assert profile == "standard"
+        assert local_files_only
+        raise WorkspaceInitError("model is absent from the local cache")
+
+    monkeypatch.setattr("builtins.input", confirm_replace)
+    monkeypatch.setattr(rag_ingest, "load_embedding_model", fail_local_load)
+
+    with pytest.raises(
+        RAGIngestError,
+        match=(
+            r"(?s)not available locally.*"
+            r"rag init --profile standard --dir .*workspace"
+        ),
+    ):
+        ingest_case("CASE-001", issue_path, pcap_path)
+
+    assert stored_issue.read_text(encoding="utf-8") == "old issue"
+    assert collection.records == {
+        old_id: {
+            "document": "old document",
+            "metadata": old_metadata,
+            "embedding": [1.0],
+        }
+    }
+
+
+def test_workspace_analysis_resources_use_existing_loaders_in_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    workspace = initialize_workspace(tmp_path / "workspace", "standard")
+    mib_dir = workspace / "mib-json"
+    (mib_dir / "b.json").write_text("{}", encoding="utf-8")
+    (mib_dir / "a.json").write_text("{}", encoding="utf-8")
+    (mib_dir / "ignored.JSON").write_text("{}", encoding="utf-8")
+    (mib_dir / "ignored.txt").write_text("{}", encoding="utf-8")
+    nested = mib_dir / "nested"
+    nested.mkdir()
+    (nested / "ignored.json").write_text("{}", encoding="utf-8")
+    loaded_resources: list[str] = []
+
+    def load_mib_json(path: str) -> bool:
+        loaded_resources.append(Path(path).name)
+        return True
+
+    def load_semantics(path: str) -> bool:
+        loaded_resources.append(str(Path(path).relative_to(workspace)))
+        return True
+
+    monkeypatch.setattr("omci.cli.load_mib_json", load_mib_json)
+    monkeypatch.setattr(
+        rag_ingest.omcisemantic, "load_external_semantics", load_semantics
+    )
+
+    rag_ingest._load_workspace_analysis_resources(workspace)
+
+    assert loaded_resources == ["a.json", "b.json", "semantics"]
+
+
+def test_workspace_resources_load_before_semantic_unit_analysis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, issue_path, pcap_path, _, _ = prepare_ingest(tmp_path, monkeypatch)
+    events: list[str] = []
+
+    def load_resources(workspace: Path) -> None:
+        del workspace
+        events.append("resources")
+
+    def analyze(path: Path, issue_text: str) -> dict[str, str]:
+        del path
+        events.append("analysis")
+        return semantic_units(issue_text)
+
+    monkeypatch.setattr(
+        rag_ingest, "_load_workspace_analysis_resources", load_resources
+    )
+    monkeypatch.setattr(rag_ingest, "_analyze_pcap", analyze)
+
+    assert ingest_case("CASE-001", issue_path, pcap_path)
+    assert events == ["resources", "analysis"]
+
+
+def test_invalid_workspace_mib_json_preserves_existing_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    actual_resource_loader = rag_ingest._load_workspace_analysis_resources
+    workspace, issue_path, pcap_path, collection, _ = prepare_ingest(
+        tmp_path, monkeypatch
+    )
+    invalid_json = workspace / "mib-json" / "invalid.json"
+    invalid_json.write_text("{invalid", encoding="utf-8")
+    stored_issue = workspace / "issues" / "CASE-001.md"
+    stored_issue.write_text("old issue", encoding="utf-8")
+    old_id = make_chunk_id("CASE-001", "issue_summary", 0)
+    collection.records[old_id] = {
+        "document": "old document",
+        "metadata": {
+            "case_id": "CASE-001",
+            "semantic_unit": "issue_summary",
+            "chunk_index": 0,
+            "issue_file": "CASE-001.md",
+            "pcap_file": "old.pcap",
+        },
+        "embedding": [1.0],
+    }
+
+    def reject_mib_json(path: str) -> bool:
+        assert Path(path) == invalid_json
+        return False
+
+    def fail_if_analyzed(path: Path, issue_text: str) -> dict[str, str]:
+        del path, issue_text
+        raise AssertionError("analysis must not start")
+
+    monkeypatch.setattr("omci.cli.load_mib_json", reject_mib_json)
+    monkeypatch.setattr(
+        rag_ingest, "_load_workspace_analysis_resources", actual_resource_loader
+    )
+    monkeypatch.setattr(rag_ingest, "_analyze_pcap", fail_if_analyzed)
+
+    with pytest.raises(RAGIngestError, match="invalid.json"):
+        ingest_case("CASE-001", issue_path, pcap_path)
+
+    assert stored_issue.read_text(encoding="utf-8") == "old issue"
+    assert collection.records[old_id]["document"] == "old document"
+
+
+def test_semantic_plugin_error_preserves_existing_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    actual_resource_loader = rag_ingest._load_workspace_analysis_resources
+    workspace, issue_path, pcap_path, collection, _ = prepare_ingest(
+        tmp_path, monkeypatch
+    )
+    plugin = workspace / "semantics" / "broken.py"
+    plugin.write_text("raise RuntimeError('broken plugin')", encoding="utf-8")
+    stored_issue = workspace / "issues" / "CASE-001.md"
+    stored_issue.write_text("old issue", encoding="utf-8")
+    old_id = make_chunk_id("CASE-001", "issue_summary", 0)
+    collection.records[old_id] = {
+        "document": "old document",
+        "metadata": {
+            "case_id": "CASE-001",
+            "semantic_unit": "issue_summary",
+            "chunk_index": 0,
+            "issue_file": "CASE-001.md",
+            "pcap_file": "old.pcap",
+        },
+        "embedding": [1.0],
+    }
+
+    def load_mib_json(path: str) -> bool:
+        del path
+        return True
+
+    def fail_semantics(path: str) -> bool:
+        assert Path(path) == workspace / "semantics"
+        raise RuntimeError(f"broken plugin: {plugin.name}")
+
+    monkeypatch.setattr("omci.cli.load_mib_json", load_mib_json)
+    monkeypatch.setattr(
+        rag_ingest.omcisemantic, "load_external_semantics", fail_semantics
+    )
+    monkeypatch.setattr(
+        rag_ingest, "_load_workspace_analysis_resources", actual_resource_loader
+    )
+
+    with pytest.raises(RAGIngestError, match="broken.py"):
+        ingest_case("CASE-001", issue_path, pcap_path)
+
+    assert stored_issue.read_text(encoding="utf-8") == "old issue"
+    assert collection.records[old_id]["document"] == "old document"
 
 
 def test_all_required_sections_present() -> None:
