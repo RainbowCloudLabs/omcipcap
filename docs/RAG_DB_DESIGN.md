@@ -17,6 +17,7 @@
 | `case_id` | String | Issue case identifier |
 | `semantic_unit` | String | Semantic unit represented by the chunk |
 | `chunk_index` | Integer | Zero-based sequence within the semantic unit |
+| `priority` | Integer | Fixed retrieval priority of the semantic unit |
 | `issue_file` | String | Source issue Markdown filename |
 | `pcap_file` | String | Source PCAP filename |
 

@@ -347,34 +347,79 @@ structure.
 
 ### Semantic Units
 
-The chunker recognizes the following semantic units.
+The chunker recognizes the following semantic units. Each semantic unit MUST
+have a predefined retrieval priority.
 
-| Display Name | semantic_unit |
-|--------------|---------------|
-| Issue Summary | `issue_summary` |
-| Failed Check Results | `failed_check_results` |
-| Core MIB Summary | `core_mib_summary` |
-| Service Path | `service_path` |
-| Upload MIB | `upload_mib` |
-| Vendor-specific MIB | `vendor_specific_mib` |
-| Full MIB | `full_mib` |
+| Display Name | `semantic_unit` | Priority |
+|---|---|---:|
+| Failed Check Results | `failed_check_results` | 100 |
+| Issue Summary | `issue_summary` | 90 |
+| Service Path | `service_path` | 80 |
+| Core MIB Summary | `core_mib_summary` | 70 |
+| Vendor-specific MIB | `vendor_specific_mib` | 60 |
+| Upload MIB | `upload_mib` | 50 |
+| Full MIB | `full_mib` | 10 |
 
-The chunker should preserve semantic boundaries whenever possible.
+Higher priority values indicate greater retrieval importance.
 
-A semantic unit should only be split when required by the active profile's
-indexing constraints, such as token budget or maximum chunk size.
+The chunker SHOULD preserve semantic-unit boundaries whenever possible.
 
-When a semantic unit exceeds the profile's chunk-size limit, it is split into
-multiple chunks.
+A semantic unit MUST only be split when required by the active profile's
+indexing constraints, such as the token budget or maximum chunk size.
 
-Each chunk is identified by:
+When a semantic unit exceeds the active profile's chunk-size limit, it MUST be
+split into multiple chunks.
+
+Each generated chunk MUST be uniquely identified by the combination of:
 
 - `case_id`
 - `semantic_unit`
 - `chunk_index`
 
-where `chunk_index` is zero-based and scoped to the combination of
-`case_id` and `semantic_unit`.
+The `chunk_index` MUST:
+
+- be zero-based;
+- increase sequentially without gaps; and
+- be scoped to the combination of `case_id` and `semantic_unit`.
+
+For example:
+
+```text
+CASE-001 / service_path / 0
+CASE-001 / service_path / 1
+CASE-001 / full_mib / 0
+```
+
+The semantic-unit priority MUST be stored in the metadata of every generated
+chunk.
+
+All chunks generated from the same semantic unit MUST use the same priority.
+
+The priority MUST be obtained from the shared semantic-unit definition and
+MUST NOT be duplicated independently by the chunker, ingestion pipeline, or
+query implementation.
+
+Semantic-unit priority MUST NOT replace semantic similarity.
+
+Instead, it MUST be used only as a secondary ranking signal when multiple
+candidate results have comparable semantic similarity.
+
+The query implementation SHOULD rank results using the following precedence:
+
+1. Higher semantic similarity.
+2. Higher semantic-unit priority when similarity scores are comparable.
+3. Lower `chunk_index`.
+4. Lexicographical `case_id` ordering as the final deterministic tie-breaker.
+
+The priority adjustment MUST be bounded so that a substantially less relevant
+chunk cannot outrank a substantially more relevant chunk solely because of its
+semantic-unit priority.
+
+The query implementation MUST apply one deterministic comparison rule for
+determining when similarity scores are considered comparable.
+
+That comparison rule or weighting factor is defined by the query
+implementation and MUST be applied consistently for all queries.
 
 ### Profile Chunk Limits
 

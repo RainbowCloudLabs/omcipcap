@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from omci import omcimd, omciparser, omcisemantic
+from omci.ai.rag.semantic_units import SEMANTIC_UNIT_DEFINITIONS
 from omci.ai.rag.workspace import (
     DB_SCHEMA_VERSION,
     PROFILE_CONFIGS,
@@ -29,14 +30,8 @@ REQUIRED_SECTIONS = (
     "How-To-Identify",
     "Solution",
 )
-SEMANTIC_UNITS = (
-    "issue_summary",
-    "failed_check_results",
-    "core_mib_summary",
-    "service_path",
-    "upload_mib",
-    "vendor_specific_mib",
-    "full_mib",
+SEMANTIC_UNITS = tuple(
+    definition.semantic_unit for definition in SEMANTIC_UNIT_DEFINITIONS
 )
 CANONICAL_SECTIONS = (*REQUIRED_SECTIONS, "Environment")
 SUPPORTED_CAPTURE_SUFFIXES = (".pcap", ".pcapng")
@@ -204,7 +199,8 @@ def build_chunk_records(
     documents: list[str] = []
     metadatas: list[dict[str, object]] = []
 
-    for semantic_unit in SEMANTIC_UNITS:
+    for definition in SEMANTIC_UNIT_DEFINITIONS:
+        semantic_unit = definition.semantic_unit
         chunks = split_semantic_unit(
             semantic_units.get(semantic_unit, ""),
             tokenizer,
@@ -219,6 +215,7 @@ def build_chunk_records(
                     "case_id": case_id,
                     "semantic_unit": semantic_unit,
                     "chunk_index": chunk_index,
+                    "priority": definition.priority,
                     "issue_file": issue_file,
                     "pcap_file": pcap_file,
                 }

@@ -20,6 +20,7 @@ from omci.ai.rag.ingest import (
     split_semantic_unit,
     validate_issue_markdown,
 )
+from omci.ai.rag.semantic_units import SEMANTIC_UNIT_DEFINITIONS
 from omci.ai.rag import workspace as rag_workspace
 from omci.ai.rag.workspace import (
     PROFILE_CONFIGS,
@@ -236,10 +237,16 @@ def test_successful_ingestion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         make_chunk_id("CASE-001", unit, 0) for unit in SEMANTIC_UNITS
     ]
     for unit, record in zip(SEMANTIC_UNITS, collection.records.values()):
+        priority = next(
+            definition.priority
+            for definition in SEMANTIC_UNIT_DEFINITIONS
+            if definition.semantic_unit == unit
+        )
         assert record["metadata"] == {
             "case_id": "CASE-001",
             "semantic_unit": unit,
             "chunk_index": 0,
+            "priority": priority,
             "issue_file": "CASE-001.md",
             "pcap_file": "sample.pcap",
         }
@@ -760,6 +767,36 @@ def test_chunk_indices_are_sequential_per_semantic_unit() -> None:
         )
         for metadata in metadatas
     ]
+
+
+def test_every_semantic_unit_has_the_specified_priority() -> None:
+    assert {
+        definition.semantic_unit: definition.priority
+        for definition in SEMANTIC_UNIT_DEFINITIONS
+    } == {
+        "failed_check_results": 100,
+        "issue_summary": 90,
+        "service_path": 80,
+        "core_mib_summary": 70,
+        "vendor_specific_mib": 60,
+        "upload_mib": 50,
+        "full_mib": 10,
+    }
+
+
+def test_all_chunks_from_one_semantic_unit_share_priority() -> None:
+    _, _, metadatas = build_chunk_records(
+        "CASE-001",
+        {"failed_check_results": "abcdefghijklmnop"},
+        CharacterTokenizer(),
+        6,
+        2,
+        "CASE-001.md",
+        "sample.pcap",
+    )
+
+    assert len(metadatas) > 1
+    assert {metadata["priority"] for metadata in metadatas} == {100}
 
 
 def test_flattened_semantic_unit_order_is_preserved() -> None:
