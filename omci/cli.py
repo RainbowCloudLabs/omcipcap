@@ -17,8 +17,18 @@ from omci import omcisemantic
 from omci import omcirich
 from omci import omcimd
 from omci import overview
-from omci.ai.rag import RAGIngestError, ingest_case, initialize_workspace
-from omci.ai.rag.workspace import SUPPORTED_PROFILES, WorkspaceInitError
+from omci.ai.rag import (
+    RAGIngestError,
+    get_active_profile,
+    get_rag_status,
+    ingest_case,
+    initialize_workspace,
+)
+from omci.ai.rag.workspace import (
+    PROFILE_CONFIGS,
+    SUPPORTED_PROFILES,
+    WorkspaceInitError,
+)
 from omci.omci import load_omci_packets
 
 
@@ -272,6 +282,8 @@ def main() -> None:
         "--issue-md", required=True, help="Issue Markdown file"
     )
     rag_ingest_p.add_argument("pcap", help="Path to pcap file")
+    rag_subparsers.add_parser("status", help="Show RAG workspace status")
+    rag_subparsers.add_parser("profiles", help="List supported RAG profiles")
 
     # --- Sub-command: check ---
     check_p = subparsers.add_parser(
@@ -405,6 +417,40 @@ def main() -> None:
             parser.error(str(exc))
         if ingested:
             print(f'[+] RAG case ingested: "{args.case_id}"')
+    elif (
+        args.command == "ai"
+        and args.ai_command == "rag"
+        and args.rag_command == "status"
+    ):
+        try:
+            status = get_rag_status()
+        except WorkspaceInitError as exc:
+            parser.error(str(exc))
+        print(f"Workspace:              {status.workspace}")
+        print(f"Active profile:         {status.profile}")
+        print(f"Database status:        {status.database_status}")
+        print(f"Compatibility:          {status.compatibility}")
+        print(
+            "Rebuild required:       "
+            f"{'yes' if status.rebuild_required else 'no'}"
+        )
+        print(f"Indexed issue cases:    {status.indexed_cases}")
+    elif (
+        args.command == "ai"
+        and args.ai_command == "rag"
+        and args.rag_command == "profiles"
+    ):
+        active_profile = get_active_profile()
+        print(
+            f"{'PROFILE':<14}{'ACTIVE':<8}{'EMBEDDING MODEL':<44}"
+            f"{'MAX TOKENS':<12}OVERLAP"
+        )
+        for profile, config in PROFILE_CONFIGS.items():
+            marker = "*" if profile == active_profile else ""
+            print(
+                f"{profile:<14}{marker:<8}{str(config['model']):<44}"
+                f"{str(config['max_tokens']):<12}{config['token_overlap']}"
+            )
     elif args.command == "check":
         run_omcicheck(
             args.pcap,

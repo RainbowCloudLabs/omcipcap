@@ -148,23 +148,22 @@ If vendor MIB definitions or semantic plugins cannot be loaded:
 - No semantic chunks MUST be committed.
 - The error message SHOULD identify the failing file or plugin.
 
-## Profile Management
+## Workspace Status
+
+### Show Workspace Status
+
+#### Synopsis
 
 ```text
-# show workspace status
 omcipcap ai rag status
-
-# rebuild database
-omcipcap ai rag rebuild
-
-# list available profiles
-omcipcap ai rag profile list
-
-# show profile information
-omcipcap ai rag profile show <profile>
 ```
 
-The `status` command reports:
+The `rag status` command reports the state of the active RAG workspace.
+
+The command MUST resolve the active workspace from the global workspace
+configuration.
+
+The command MUST report:
 
 - Workspace path
 - Active profile
@@ -173,5 +172,151 @@ The `status` command reports:
 - Rebuild requirement
 - Number of indexed issue cases
 
-The `rebuild` command recreates the vector database from the stored issue
+Example:
+
+```text
+Workspace:              /home/user/rag
+Active profile:         workstation
+Database status:        ready
+Compatibility:          compatible
+Rebuild required:       no
+Indexed issue cases:    12
+```
+
+The database status MUST use one of the following values:
+
+- `ready`
+- `missing`
+- `empty`
+- `invalid`
+
+The meanings are:
+
+- `ready` — The vector database exists, can be opened, and contains indexed
+  issue cases.
+- `missing` — No vector database exists.
+- `empty` — The vector database exists but contains no indexed issue cases.
+- `invalid` — The vector database exists but cannot be opened, or its required
+  metadata is missing or invalid.
+
+The compatibility status MUST use one of the following values:
+
+- `compatible`
+- `incompatible`
+- `unknown`
+- `not-applicable`
+
+The meanings are:
+
+- `compatible` — The vector database metadata matches the active profile.
+- `incompatible` — The vector database was built using settings that do not
+  match the active profile.
+- `unknown` — Compatibility cannot be determined because required metadata is
+  missing or invalid.
+- `not-applicable` — No vector database currently exists.
+
+`Rebuild required` MUST be reported as `yes` when the database exists and is
+incompatible with the active profile.
+
+A missing or empty database does not by itself require a rebuild.
+
+The indexed issue case count MUST represent the number of unique stored issue
+cases, not the number of semantic chunks.
+
+The `status` command MUST NOT:
+
+- modify workspace files
+- modify global workspace configuration
+- create or rebuild the vector database
+- download or load embedding models
+- contact the Hugging Face Hub
+
+If the global workspace configuration is missing or invalid, the command MUST
+fail with a clear error instructing the user to run:
+
+```text
+omcipcap ai rag init --profile <profile> --dir <workdir>
+```
+
+If the configured workspace path does not exist or does not contain valid
+workspace metadata, the command MUST fail without creating or modifying any
+files.
+
+---
+
+## Profile Management
+
+### List Profiles
+
+#### Synopsis
+
+```text
+omcipcap ai rag profiles
+```
+
+The `rag profiles` command lists all RAG profiles supported by the installed
+OMCIPcap version.
+
+The command MUST NOT require an initialized RAG workspace.
+
+The command MUST report:
+
+- Profile name
+- Embedding model
+- Maximum tokens per chunk
+- Token overlap
+
+Profiles MUST be listed in deterministic order.
+
+Example without an active workspace:
+
+```text
+PROFILE       ACTIVE  EMBEDDING MODEL                              MAX TOKENS  OVERLAP
+standard              sentence-transformers/all-MiniLM-L6-v2      256         32
+workstation           BAAI/bge-m3                                  512         64
+server                BAAI/bge-m3                                  512         64
+```
+
+If an active workspace can be resolved, the active profile SHOULD be marked:
+
+```text
+PROFILE       ACTIVE  EMBEDDING MODEL                              MAX TOKENS  OVERLAP
+standard              sentence-transformers/all-MiniLM-L6-v2      256         32
+workstation   *       BAAI/bge-m3                                  512         64
+server                BAAI/bge-m3                                  512         64
+```
+
+Failure to resolve an active workspace MUST NOT prevent supported profiles
+from being listed.
+
+If workspace metadata references an unknown profile, no profile MUST be marked
+as active.
+
+The command MUST read profile definitions from the same shared profile
+configuration used by `rag init` and `rag ingest`.
+
+Profile definitions MUST NOT be duplicated in command-specific CLI code.
+
+The `profiles` command MUST NOT:
+
+- initialize or modify a workspace
+- create or open the vector database
+- download or load embedding models
+- contact the Hugging Face Hub
+
+---
+
+## Database Management
+
+### Rebuild Database
+
+#### Synopsis
+
+```text
+omcipcap ai rag rebuild
+```
+
+The `rag rebuild` command recreates the vector database from the stored issue
 cases using the active profile.
+
+The detailed rebuild behavior is specified separately.

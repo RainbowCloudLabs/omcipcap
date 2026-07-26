@@ -8,10 +8,14 @@
 """RAG workspace support."""
 
 from omci.ai.rag.ingest import RAGIngestError, ingest_case
+from omci.ai.rag.status import RAGStatus, get_active_profile, get_rag_status
 from omci.ai.rag.workspace import initialize_workspace, resolve_workspace
 
 __all__ = [
     "RAGIngestError",
+    "RAGStatus",
+    "get_active_profile",
+    "get_rag_status",
     "ingest_case",
     "initialize_workspace",
     "resolve_workspace",

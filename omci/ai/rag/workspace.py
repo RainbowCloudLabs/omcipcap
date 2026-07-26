@@ -151,7 +151,9 @@ def default_workspace_config_path() -> Path:
 
 
 def _validate_workspace_metadata(
-    workspace: Path, requested_profile: str | None = None
+    workspace: Path,
+    requested_profile: str | None = None,
+    require_database_dir: bool = True,
 ) -> dict[str, object]:
     config_path = workspace / "config.json"
     if not config_path.is_file():
@@ -192,6 +194,8 @@ def _validate_workspace_metadata(
         raise WorkspaceInitError("RAG workspace created_at must use UTC")
 
     for dirname in WORKSPACE_DIRS:
+        if dirname == "db" and not require_database_dir:
+            continue
         if not (workspace / dirname).is_dir():
             raise WorkspaceInitError(
                 f"RAG workspace is incomplete; missing directory: '{dirname}'"
@@ -266,7 +270,9 @@ def initialize_workspace(workdir: Path, profile: str) -> Path:
     return workspace
 
 
-def resolve_workspace() -> tuple[Path, dict[str, object]]:
+def resolve_workspace(
+    require_database_dir: bool = True,
+) -> tuple[Path, dict[str, object]]:
     user_config_path = default_workspace_config_path()
     if not user_config_path.is_file():
         raise WorkspaceInitError(
@@ -296,7 +302,10 @@ def resolve_workspace() -> tuple[Path, dict[str, object]]:
         )
 
     try:
-        config = _validate_workspace_metadata(workspace)
+        config = _validate_workspace_metadata(
+            workspace,
+            require_database_dir=require_database_dir,
+        )
     except WorkspaceInitError as exc:
         raise WorkspaceInitError(
             f"Configured RAG workspace is invalid: {exc}. "
