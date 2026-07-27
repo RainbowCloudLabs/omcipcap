@@ -15,6 +15,7 @@ from omci.ai.rag.ingest import (
     RAGIngestError,
     SEMANTIC_UNITS,
     build_chunk_records,
+    compose_service_path,
     extract_markdown_section,
     ingest_case,
     make_chunk_id,
@@ -53,6 +54,116 @@ def avoid_model_download(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def semantic_units(issue_text: str) -> dict[str, str]:
     return {unit: f"{unit}\n{issue_text}" for unit in SEMANTIC_UNITS}
+
+
+def test_compose_service_path_skips_empty_sections() -> None:
+    assert compose_service_path(
+        "  ## VLAN\n\nVLAN data\n",
+        "",
+        "   \n",
+        "\n## Topology\n\nTopology data  ",
+    ) == "## VLAN\n\nVLAN data\n\n## Topology\n\nTopology data"
+
+
+def test_analyze_pcap_builds_complete_service_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packets = object()
+    full_mib = object()
+    vlan_data = object()
+    flow_data = object()
+    topology_data = object()
+    renderer_inputs: list[tuple[str, object]] = []
+
+    monkeypatch.setattr(
+        rag_ingest,
+        "load_omci_packets",
+        lambda path, include_raw: packets,
+    )
+    monkeypatch.setattr(
+        rag_ingest.omciparser,
+        "get_check_results",
+        lambda value, only_failed: "check-data",
+    )
+
+    def get_mib_data(
+        value: object,
+        only_upload: bool = False,
+        only_vendor: bool = False,
+    ) -> str:
+        assert value is packets
+        if only_upload:
+            return "upload-data"
+        if only_vendor:
+            return "vendor-data"
+        return "full-data"
+
+    monkeypatch.setattr(rag_ingest.omciparser, "get_mib_db_data", get_mib_data)
+    monkeypatch.setattr(
+        rag_ingest.omciparser,
+        "get_all_mib_db",
+        lambda value: full_mib,
+    )
+
+    def get_vlan(value: object) -> object:
+        assert value is full_mib
+        return vlan_data
+
+    def get_flow(value: object) -> object:
+        assert value is full_mib
+        return flow_data
+
+    def get_topology(value: object) -> object:
+        assert value is packets
+        return topology_data
+
+    monkeypatch.setattr(rag_ingest.omciparser, "get_vlan_data", get_vlan)
+    monkeypatch.setattr(rag_ingest.omciparser, "get_flow_data", get_flow)
+    monkeypatch.setattr(rag_ingest.omciparser, "get_topology_data", get_topology)
+    monkeypatch.setattr(
+        rag_ingest.omcimd,
+        "render_check_md",
+        lambda value: "CHECK",
+    )
+    monkeypatch.setattr(
+        rag_ingest.omcimd,
+        "render_mibdb_md",
+        lambda value, short: f"MIB:{value}:{short}",
+    )
+
+    def render_vlan(value: object) -> str:
+        renderer_inputs.append(("vlan", value))
+        return "## VLAN"
+
+    def render_flow(value: object) -> str:
+        renderer_inputs.append(("flow", value))
+        return "## T-CONT Flow"
+
+    def render_topology(value: object) -> str:
+        renderer_inputs.append(("topology", value))
+        return "## Topology"
+
+    monkeypatch.setattr(rag_ingest.omcimd, "render_vlan_md", render_vlan)
+    monkeypatch.setattr(rag_ingest.omcimd, "render_tcont_flow_md", render_flow)
+    monkeypatch.setattr(rag_ingest.omcimd, "render_topology_md", render_topology)
+
+    result = rag_ingest._analyze_pcap(Path("sample.pcap"), "ISSUE")
+
+    assert result == {
+        "issue_summary": "ISSUE",
+        "failed_check_results": "CHECK",
+        "core_mib_summary": "MIB:full-data:True",
+        "service_path": "## VLAN\n\n## T-CONT Flow\n\n## Topology",
+        "upload_mib": "MIB:upload-data:True",
+        "vendor_specific_mib": "MIB:vendor-data:True",
+        "full_mib": "MIB:full-data:True",
+    }
+    assert renderer_inputs == [
+        ("vlan", vlan_data),
+        ("flow", flow_data),
+        ("topology", topology_data),
+    ]
+    assert result["service_path"] != "## T-CONT Flow"
 
 
 class FakeCollection:

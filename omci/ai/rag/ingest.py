@@ -282,6 +282,14 @@ def _load_workspace_analysis_resources(workspace: Path) -> None:
         raise RAGIngestError(f"Failed to load semantic plugins from '{semantics_dir}'")
 
 
+def compose_service_path(*sections: str) -> str:
+    return "\n\n".join(
+        section.strip()
+        for section in sections
+        if section and section.strip()
+    )
+
+
 def _analyze_pcap(pcap_path: Path, issue_text: str) -> dict[str, str]:
     packets = load_omci_packets(str(pcap_path), include_raw=True)
     check_data = omciparser.get_check_results(packets, only_failed=True)
@@ -289,13 +297,20 @@ def _analyze_pcap(pcap_path: Path, issue_text: str) -> dict[str, str]:
     full_data = omciparser.get_mib_db_data(packets)
     vendor_data = omciparser.get_mib_db_data(packets, only_vendor=True)
     full_mib = omciparser.get_all_mib_db(packets)
+    vlan_data = omciparser.get_vlan_data(full_mib)
     flow_data = omciparser.get_flow_data(full_mib)
+    topology_data = omciparser.get_topology_data(packets)
+    service_path = compose_service_path(
+        omcimd.render_vlan_md(vlan_data),
+        omcimd.render_tcont_flow_md(flow_data),
+        omcimd.render_topology_md(topology_data),
+    )
 
     return {
         "issue_summary": issue_text,
         "failed_check_results": omcimd.render_check_md(check_data),
         "core_mib_summary": omcimd.render_mibdb_md(full_data, short=True),
-        "service_path": omcimd.render_tcont_flow_md(flow_data, short=True),
+        "service_path": service_path,
         "upload_mib": omcimd.render_mibdb_md(upload_data, short=True),
         "vendor_specific_mib": omcimd.render_mibdb_md(vendor_data, short=True),
         "full_mib": omcimd.render_mibdb_md(full_data, short=True),

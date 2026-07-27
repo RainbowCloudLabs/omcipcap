@@ -465,6 +465,42 @@ determining when similarity scores are considered comparable.
 That comparison rule or weighting factor is defined by the query
 implementation and MUST be applied consistently for all queries.
 
+#### service_path
+
+`service_path` represents the logical end-to-end OMCI service provisioning path reconstructed
+from the analyzed MIB database. It is intended to provide a concise engineering view of how
+subscriber services are connected from the UNI side toward the PON interface.
+
+The current implementation combines multiple rendered summaries:
+
+```text
+service_path =
+    render_vlan_md(...)
+  + render_tcont_flow_md(...)
+  + render_topology_md(...)
+```
+
+Specifically:
+
+- **render_vlan_md()**
+  - VLAN translation rules
+  - Extended VLAN Tagging Operation Configuration Data
+  - Service VLAN mapping
+
+- **render_tcont_flow_md()**
+  - T-CONT allocation
+  - GEM Port relationships
+  - Traffic flow mapping
+
+- **render_topology_md()**
+  - OMCI managed entity relationships
+  - UNI / VEIP / ANI connectivity
+  - End-to-end service topology
+
+Unlike `core_mib_summary`, which summarizes the MIB database itself, `service_path`
+focuses on reconstructing the logical service provisioning path used by engineers during
+OMCI troubleshooting.
+
 ### Profile Chunk Limits
 
 Each profile MUST define an explicit maximum token count and token overlap for
