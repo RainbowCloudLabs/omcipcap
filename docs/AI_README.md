@@ -68,3 +68,17 @@ pip install "omcipcap[ai]"
 ```
 
 RAG query, rebuild, list, and show commands are not implemented yet.
+
+## Current profile and workspace limitations
+
+`rag rebuild` is planned for a future release and is not currently available.
+The first-stage RAG MVP does not support:
+
+- changing the profile of an existing workspace;
+- changing its embedding model;
+- migrating an existing workspace to another profile;
+- merging multiple workspaces; or
+- rebuilding an existing workspace under another profile.
+
+To use a different profile, create a new workspace with that profile and
+re-ingest the issue cases into the new workspace.

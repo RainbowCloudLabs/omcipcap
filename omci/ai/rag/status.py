@@ -23,7 +23,6 @@ class RAGStatus:
     profile: str
     database_status: str
     compatibility: str
-    rebuild_required: bool
     indexed_cases: int
 
 
@@ -57,7 +56,6 @@ def get_rag_status() -> RAGStatus:
             profile=profile,
             database_status="missing",
             compatibility="not-applicable",
-            rebuild_required=False,
             indexed_cases=0,
         )
 
@@ -69,7 +67,6 @@ def get_rag_status() -> RAGStatus:
             compatibility=(
                 "compatible" if _is_compatible(config, profile) else "incompatible"
             ),
-            rebuild_required=not _is_compatible(config, profile),
             indexed_cases=0,
         )
 
@@ -101,7 +98,6 @@ def get_rag_status() -> RAGStatus:
             profile=profile,
             database_status="invalid",
             compatibility="unknown",
-            rebuild_required=False,
             indexed_cases=0,
         )
 
@@ -112,7 +108,6 @@ def get_rag_status() -> RAGStatus:
         profile=profile,
         database_status="ready" if case_ids else "empty",
         compatibility=compatibility,
-        rebuild_required=not compatible,
         indexed_cases=len(case_ids),
     )
 

@@ -97,7 +97,6 @@ def test_rag_status_fresh_workspace_database_empty(workspace: Path) -> None:
 
     assert result.database_status == "empty"
     assert result.compatibility == "compatible"
-    assert not result.rebuild_required
     assert result.indexed_cases == 0
 
 
@@ -108,7 +107,6 @@ def test_rag_status_database_missing(workspace: Path) -> None:
 
     assert result.database_status == "missing"
     assert result.compatibility == "not-applicable"
-    assert not result.rebuild_required
     assert result.indexed_cases == 0
 
 
@@ -128,7 +126,6 @@ def test_rag_status_database_empty(
 
     assert result.database_status == "empty"
     assert result.compatibility == "compatible"
-    assert not result.rebuild_required
 
 
 def test_rag_status_ready_counts_unique_cases(
@@ -168,7 +165,6 @@ def test_rag_status_incompatible_database(
     result = rag_status.get_rag_status()
 
     assert result.compatibility == "incompatible"
-    assert result.rebuild_required
 
 
 @pytest.mark.parametrize(
@@ -190,7 +186,6 @@ def test_rag_status_invalid_database(
 
     assert result.database_status == "invalid"
     assert result.compatibility == "unknown"
-    assert not result.rebuild_required
 
 
 def test_rag_status_cli_output(
@@ -213,6 +208,7 @@ def test_rag_status_cli_output(
     output = capsys.readouterr().out
     assert f"Workspace:              {workspace}" in output
     assert "Database status:        ready" in output
+    assert "Rebuild required" not in output
     assert "Indexed issue cases:    1" in output
 
 

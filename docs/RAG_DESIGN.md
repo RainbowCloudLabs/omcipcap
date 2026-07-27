@@ -40,10 +40,17 @@ to build it.
 Before using an existing database, OMCIPcap validates that it is compatible
 with the active profile.
 
-If the database is incompatible, it must not be reused and should be rebuilt.
+If the database is incompatible, it must not be reused. In the first-stage RAG
+MVP, the replacement must be created as a new workspace.
 
 Database compatibility is determined primarily by the database schema version
 and profile requirements rather than the OMCIPcap release version alone.
+
+Database rebuild is a future capability. The first-stage RAG MVP does not
+implement `rag rebuild`, profile migration, workspace migration, workspace
+merging, or changing the embedding model of an existing workspace. When a
+different profile or embedding model is required, users must create a new
+workspace and re-ingest their issue cases.
 
 ## Database Schema
 
@@ -197,9 +204,11 @@ The configuration file contains only the workspace location:
 The `rag init` command MUST create or update this file after successfully
 initializing the workspace. The stored path MUST be absolute and normalized.
 
-Subsequent RAG commands, including `ingest`, `query`, `list`, `show`, `status`,
-and `rebuild`, resolve the active workspace from this configuration file. Users
-do not need to provide the workspace directory again for each command.
+All workspace-based RAG commands resolve the active workspace from this
+configuration file.
+
+Commands that operate on an existing workspace use the same workspace selection
+mechanism and do not require users to specify the workspace directory again.
 
 The per-user configuration file stores only user-level workspace selection.
 Workspace metadata, including the database schema version, profile ID, OMCIPcap
@@ -216,6 +225,33 @@ omcipcap ai rag init --profile <profile> --dir <workdir>
 
 The configuration file SHOULD be written atomically to avoid leaving a partial
 or corrupted file.
+
+
+### Workspace Profile Immutability
+
+A workspace is permanently associated with the profile selected during
+`rag init`.
+
+Once initialized, the workspace profile MUST NOT be changed.
+
+Running:
+
+```text
+omcipcap ai rag init --profile <another-profile> --dir <existing-workspace>
+```
+
+against an existing workspace created with a different profile MUST fail with a
+clear profile mismatch error.
+
+The first-stage RAG MVP does not support:
+
+- changing the profile of an existing workspace;
+- changing its embedding model;
+- migrating a workspace to another profile; or
+- merging multiple workspaces.
+
+Users requiring another profile MUST create a new workspace and re-ingest their
+issue cases.
 
 ---
 
@@ -236,9 +272,9 @@ collection metadata.
 ```
 
 - `db_schema_version` identifies the database schema version.
-- `profile_id` identifies the profile used to build or rebuild the database.
-- `omcipcap_version` records the OMCIPcap version that created or last rebuilt
-  the database.
+- `profile_id` identifies the profile used to build the database.
+- `omcipcap_version` records the OMCIPcap version that created the database.
+  A future rebuild implementation may update these fields.
 
 ### standard
 
@@ -308,8 +344,10 @@ Typical profile mappings include:
 | workstation | BGE-M3 |
 | server | BGE-M3 |
 
-The concrete embedding model may change in future revisions without changing
-the CLI or user workflow.
+The concrete embedding model may change for newly created workspaces in future
+revisions without changing profile-selection syntax. Existing workspaces are
+not migrated automatically and cannot change embedding models in the
+first-stage RAG MVP.
 
 ### Embedding Model Preparation
 
@@ -506,7 +544,7 @@ The same profile configuration MUST be reused by:
 - `rag init`
 - `rag ingest`
 - `rag status`
-- `rag rebuild`
+- the planned `rag rebuild` implementation
 
 The ingestion pipeline MUST select the embedding model, token limit, and token
 overlap from the active workspace profile.
@@ -516,6 +554,24 @@ for token counting and token-level splitting.
 
 Character count, whitespace-separated word count, and fixed character slicing
 MUST NOT be used as substitutes for tokenizer-based token counting.
+
+### Profile and Workspace Migration
+
+Profile and workspace migration are outside the scope of the first-stage RAG
+MVP. The current implementation does not support:
+
+- changing the profile of an existing workspace;
+- changing its embedding model;
+- migrating a workspace to another profile;
+- merging multiple workspaces; or
+- rebuilding its database with another profile.
+
+`rag rebuild` is reserved for a future release and is not yet implemented.
+Until then, users who need another profile must create a new workspace with
+that profile and re-ingest their issue cases.
+
+Workspace migration and profile conversion are intentionally excluded from the
+first-stage implementation and will be evaluated in a future release.
 
 ## Issue Case Format
 

@@ -430,10 +430,6 @@ def main() -> None:
         print(f"Active profile:         {status.profile}")
         print(f"Database status:        {status.database_status}")
         print(f"Compatibility:          {status.compatibility}")
-        print(
-            "Rebuild required:       "
-            f"{'yes' if status.rebuild_required else 'no'}"
-        )
         print(f"Indexed issue cases:    {status.indexed_cases}")
     elif (
         args.command == "ai"

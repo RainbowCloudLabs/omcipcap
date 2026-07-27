@@ -76,8 +76,8 @@ Case "CASE-001" already exists.
 Replace existing case? [y/N]
 ```
 
-Selecting **Y** replaces the stored issue case and rebuilds its associated
-semantic chunks.
+Selecting **Y** replaces the stored issue case and regenerates its associated
+semantic chunks and embeddings.
 
 Selecting **N** cancels the operation.
 
@@ -169,7 +169,6 @@ The command MUST report:
 - Active profile
 - Database status
 - Profile/database compatibility
-- Rebuild requirement
 - Number of indexed issue cases
 
 Example:
@@ -179,7 +178,6 @@ Workspace:              /home/user/rag
 Active profile:         workstation
 Database status:        ready
 Compatibility:          compatible
-Rebuild required:       no
 Indexed issue cases:    12
 ```
 
@@ -215,11 +213,6 @@ The meanings are:
   missing or invalid.
 - `not-applicable` — No vector database currently exists.
 
-`Rebuild required` MUST be reported as `yes` when the database exists and is
-incompatible with the active profile.
-
-A missing or empty database does not by itself require a rebuild.
-
 The indexed issue case count MUST represent the number of unique stored issue
 cases, not the number of semantic chunks.
 
@@ -227,7 +220,7 @@ The `status` command MUST NOT:
 
 - modify workspace files
 - modify global workspace configuration
-- create or rebuild the vector database
+- create the vector database
 - download or load embedding models
 - contact the Hugging Face Hub
 
@@ -308,15 +301,17 @@ The `profiles` command MUST NOT:
 
 ## Database Management
 
-### Rebuild Database
+### Rebuild Database — Planned / Not Yet Implemented
 
-#### Synopsis
+`rag rebuild` is reserved for a future release and is not available in the
+first-stage RAG MVP.
 
-```text
-omcipcap ai rag rebuild
-```
+The current implementation does not support profile migration, workspace
+migration, workspace merging, or changing the embedding model of an existing
+workspace. Reinitializing an existing workspace with another profile is also
+unsupported.
 
-The `rag rebuild` command recreates the vector database from the stored issue
-cases using the active profile.
-
-The detailed rebuild behavior is specified separately.
+To use a different embedding profile, create a new workspace with the desired
+profile and re-ingest the issue cases. Future rebuild behavior will be
+specified separately; no future command syntax beyond the reserved
+`rag rebuild` name is defined here.
