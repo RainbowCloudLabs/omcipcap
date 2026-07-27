@@ -18,11 +18,15 @@ from omci import omcirich
 from omci import omcimd
 from omci import overview
 from omci.ai.rag import (
+    DEFAULT_TOP_K,
     RAGIngestError,
+    RAGQueryError,
+    format_query_results,
     get_active_profile,
     get_rag_status,
     ingest_case,
     initialize_workspace,
+    query_cases,
 )
 from omci.ai.rag.workspace import (
     PROFILE_CONFIGS,
@@ -30,6 +34,16 @@ from omci.ai.rag.workspace import (
     WorkspaceInitError,
 )
 from omci.omci import load_omci_packets
+
+
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
 
 
 def output_result(
@@ -282,6 +296,16 @@ def main() -> None:
         "--issue-md", required=True, help="Issue Markdown file"
     )
     rag_ingest_p.add_argument("pcap", help="Path to pcap file")
+    rag_query_p = rag_subparsers.add_parser(
+        "query", help="Search indexed RAG issue cases"
+    )
+    rag_query_p.add_argument("question", help="Natural-language search question")
+    rag_query_p.add_argument(
+        "--top-k",
+        type=_positive_int,
+        default=DEFAULT_TOP_K,
+        help=f"Maximum issue cases to return (default: {DEFAULT_TOP_K})",
+    )
     rag_subparsers.add_parser("status", help="Show RAG workspace status")
     rag_subparsers.add_parser("profiles", help="List supported RAG profiles")
 
@@ -417,6 +441,21 @@ def main() -> None:
             parser.error(str(exc))
         if ingested:
             print(f'[+] RAG case ingested: "{args.case_id}"')
+    elif (
+        args.command == "ai"
+        and args.ai_command == "rag"
+        and args.rag_command == "query"
+    ):
+        try:
+            results = query_cases(args.question, args.top_k)
+        except RAGQueryError as exc:
+            parser.error(str(exc))
+        if results is None:
+            print("No indexed issue cases found.")
+        elif not results:
+            print("No matching issue cases found.")
+        else:
+            print(format_query_results(results))
     elif (
         args.command == "ai"
         and args.ai_command == "rag"

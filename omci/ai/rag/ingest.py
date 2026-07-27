@@ -81,8 +81,7 @@ def validate_issue_markdown(text: str) -> None:
     ]
     if duplicates:
         raise RAGIngestError(
-            "Issue Markdown has duplicate required section(s): "
-            + ", ".join(duplicates)
+            "Issue Markdown has duplicate required section(s): " + ", ".join(duplicates)
         )
 
     empty = [
@@ -127,9 +126,7 @@ def _token_boundary_positions(text: str, tokenizer: object) -> list[list[int]]:
         positions: list[int] = []
         for match in re.finditer(pattern, text):
             character_index = (
-                match.start()
-                if pattern.startswith("(?m)(?=")
-                else match.end()
+                match.start() if pattern.startswith("(?m)(?=") else match.end()
             )
             if character_index <= 0 or character_index >= len(text):
                 continue
@@ -256,9 +253,7 @@ def _load_workspace_analysis_resources(workspace: Path) -> None:
             f"Failed to load semantic plugins from '{semantics_dir}': {exc}"
         ) from exc
     if not loaded:
-        raise RAGIngestError(
-            f"Failed to load semantic plugins from '{semantics_dir}'"
-        )
+        raise RAGIngestError(f"Failed to load semantic plugins from '{semantics_dir}'")
 
 
 def _analyze_pcap(pcap_path: Path, issue_text: str) -> dict[str, str]:
@@ -276,9 +271,7 @@ def _analyze_pcap(pcap_path: Path, issue_text: str) -> dict[str, str]:
         "core_mib_summary": omcimd.render_mibdb_md(full_data, short=True),
         "service_path": omcimd.render_tcont_flow_md(flow_data, short=True),
         "upload_mib": omcimd.render_mibdb_md(upload_data, short=True),
-        "vendor_specific_mib": omcimd.render_mibdb_md(
-            vendor_data, short=True
-        ),
+        "vendor_specific_mib": omcimd.render_mibdb_md(vendor_data, short=True),
         "full_mib": omcimd.render_mibdb_md(full_data, short=True),
     }
 
@@ -289,6 +282,7 @@ def _collection_for_workspace(
     try:
         client = chromadb_module.PersistentClient(path=str(workspace / "db"))
         metadata = {
+            "hnsw:space": "cosine",
             "db_schema_version": config["db_schema_version"],
             "profile_id": config["profile_id"],
             "omcipcap_version": config["omcipcap_version"],
@@ -303,11 +297,13 @@ def _collection_for_workspace(
 
     collection_metadata = collection.metadata or {}
     if (
-        collection_metadata.get("db_schema_version") != DB_SCHEMA_VERSION
+        collection_metadata.get("hnsw:space") != "cosine"
+        or collection_metadata.get("db_schema_version") != DB_SCHEMA_VERSION
         or collection_metadata.get("profile_id") != config["profile_id"]
     ):
         raise RAGIngestError(
-            "ChromaDB collection is incompatible with the active RAG profile"
+            "RAG database metadata is incompatible with the active workspace "
+            "(profile or distance metric mismatch)"
         )
     return collection
 
@@ -404,7 +400,9 @@ def ingest_case(
     try:
         issue_text = issue_path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise RAGIngestError(f"Cannot read issue Markdown '{issue_path}': {exc}") from exc
+        raise RAGIngestError(
+            f"Cannot read issue Markdown '{issue_path}': {exc}"
+        ) from exc
     validate_issue_markdown(issue_text)
 
     _load_workspace_analysis_resources(workspace)
@@ -448,10 +446,7 @@ def ingest_case(
             pcap_path.name,
         )
         vectors = model.encode(documents)
-        embeddings = [
-            [float(value) for value in vector]
-            for vector in vectors
-        ]
+        embeddings = [[float(value) for value in vector] for vector in vectors]
     except Exception as exc:
         raise RAGIngestError(f"Failed to generate embeddings: {exc}") from exc
 

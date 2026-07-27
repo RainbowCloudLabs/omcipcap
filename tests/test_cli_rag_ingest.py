@@ -233,6 +233,7 @@ def test_successful_ingestion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         workspace / "issues" / "CASE-001.md"
     ).read_text(encoding="utf-8") == issue_markdown()
     assert chroma.paths == [workspace / "db"]
+    assert collection.metadata["hnsw:space"] == "cosine"
     assert list(collection.records) == [
         make_chunk_id("CASE-001", unit, 0) for unit in SEMANTIC_UNITS
     ]

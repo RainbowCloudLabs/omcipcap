@@ -148,6 +148,130 @@ If vendor MIB definitions or semantic plugins cannot be loaded:
 - No semantic chunks MUST be committed.
 - The error message SHOULD identify the failing file or plugin.
 
+### Query
+
+#### Synopsis
+
+```text
+omcipcap ai rag query "<question>"
+omcipcap ai rag query "<question>" --top-k <N>
+```
+
+The `rag query` command searches indexed semantic chunks internally and returns
+a ranked list of unique issue cases.
+
+The command MUST NOT print each matching semantic chunk as an independent result.
+
+#### Default Retrieval Parameters
+
+The implementation MUST define the following named constants:
+
+```python
+DEFAULT_TOP_K = 5
+MIN_SIMILARITY = 0.70
+```
+
+If `--top-k` is omitted, the command MUST use `DEFAULT_TOP_K`.
+
+`--top-k` represents the maximum number of unique issue cases returned, not the
+maximum number of semantic chunks retrieved internally.
+
+The value of `--top-k` MUST be a positive integer.
+
+#### Case-Level Result Aggregation
+
+Retrieval is performed against semantic chunks, but command output is aggregated
+by `case_id`.
+
+The command MUST perform the following steps:
+
+1. Retrieve candidate semantic chunks from the active vector database.
+2. Convert the database distance into a consistent similarity score.
+3. Discard chunks whose similarity score is below `MIN_SIMILARITY`.
+4. Group the remaining chunks by `case_id`.
+5. Select one representative chunk for each case.
+6. Rank the unique cases using their representative chunks.
+7. Return no more than `top-k` unique cases.
+
+Each `case_id` MUST appear at most once in the output.
+
+The representative chunk for a case MUST be the highest-ranked matching chunk
+belonging to that case.
+
+Representative chunks MUST be compared using the following order:
+
+1. Higher semantic similarity
+2. Higher metadata `priority`
+3. Lower `chunk_index`
+4. Lexicographical `case_id`
+
+Semantic similarity is the primary ranking signal. Metadata priority MUST NOT
+cause a clearly less relevant chunk or case to outrank a clearly more relevant
+one.
+
+The displayed score for a case MUST be the similarity score of its
+representative chunk.
+
+The command MUST NOT return unrelated cases merely to fill `top-k`.
+
+If fewer than `top-k` unique cases satisfy the minimum similarity threshold,
+only the matching cases MUST be returned.
+
+#### Output
+
+The default output MUST use the following case-level table format:
+
+```text
+Rank  Score  Case ID
+----  -----  --------
+1     0.91   CASE-023
+2     0.84   CASE-017
+3     0.80   CASE-002
+```
+
+Output requirements:
+
+- `Rank` starts at `1`.
+- `Score` is the representative chunk similarity score.
+- `Score` SHOULD be displayed with two decimal places.
+- `Case ID` is the unique stored issue-case identifier.
+- Results MUST be sorted from the strongest match to the weakest match.
+- Output formatting MUST be deterministic.
+- Chunk text and chunk metadata MUST NOT be printed in the default output.
+
+Users can inspect a returned case with:
+
+```text
+omcipcap ai rag show <case-id>
+```
+
+If no semantic chunk satisfies `MIN_SIMILARITY`, the command MUST print:
+
+```text
+No matching issue cases found.
+```
+
+The no-match condition MUST exit normally and MUST NOT print unrelated cases.
+
+If the vector database exists but contains no indexed issue cases, the command
+MUST print:
+
+```text
+No indexed issue cases found.
+```
+
+#### Query Restrictions
+
+The `rag query` command MUST NOT:
+
+- modify the workspace
+- modify indexed issue cases
+- create the vector database
+- download embedding models
+- contact the Hugging Face Hub during normal operation
+- generate an LLM answer
+- summarize issue cases
+
 ## Workspace Status
 
 ### Show Workspace Status
