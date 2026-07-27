@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from omci.ai.rag import query as rag_query
+from omci.ai.rag import database as rag_database
 from omci.ai.rag.query import (
     DEFAULT_TOP_K,
     MIN_SIMILARITY,
@@ -139,9 +140,9 @@ def install_query_dependencies(
     chroma = FakeChroma(collection)
     model = FakeModel()
     monkeypatch.setattr(
-        rag_query,
-        "_load_ai_dependencies",
-        lambda: (chroma, object()),
+        rag_database,
+        "_load_chromadb",
+        lambda: chroma,
     )
     monkeypatch.setattr(
         rag_query,
@@ -153,7 +154,7 @@ def install_query_dependencies(
 
 def test_retrieval_constants() -> None:
     assert DEFAULT_TOP_K == 5
-    assert MIN_SIMILARITY == 0.70
+    assert MIN_SIMILARITY == 0.50
 
 
 def test_cli_uses_default_top_k(
@@ -457,7 +458,7 @@ def test_case_aggregation_uses_one_best_chunk_per_case() -> None:
 def test_aggregation_returns_fewer_than_top_k_and_filters_similarity() -> None:
     chunks = [
         RankedChunk("CASE-001", 0.75, 90, 0),
-        RankedChunk("CASE-002", 0.69, 100, 0),
+        RankedChunk("CASE-002", 0.49, 100, 0),
     ]
 
     assert aggregate_cases(chunks, 5) == [QueryResult("CASE-001", 0.75)]

@@ -55,18 +55,24 @@ workspace and re-ingest their issue cases.
 ## Database Schema
 
 The persistent storage format of the RAG database is defined in
-`RAG_DB_SCHEMA.md`.
+`RAG_DB_DESIGN.md`.
 
-The schema document defines:
+The database schema is the authoritative specification for all persisted RAG
+metadata and compatibility information.
+
+It defines:
 
 - Collection metadata
 - Chunk metadata
-- Semantic unit identifiers
+- Supported semantic unit identifiers
 - Schema versioning
 - Database compatibility requirements
 
-All RAG implementations must follow the latest schema defined in
-`RAG_DB_SCHEMA.md`.
+Collection metadata and chunk metadata MUST conform to the definitions in
+`RAG_DB_DESIGN.md`.
+
+All RAG implementations MUST follow the latest schema defined in
+`RAG_DB_DESIGN.md`.
 
 ## Related Specifications
 

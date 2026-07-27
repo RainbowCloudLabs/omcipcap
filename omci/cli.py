@@ -19,13 +19,16 @@ from omci import omcimd
 from omci import overview
 from omci.ai.rag import (
     DEFAULT_TOP_K,
+    RAGCasesError,
     RAGIngestError,
     RAGQueryError,
+    format_case_summaries,
     format_query_results,
     get_active_profile,
     get_rag_status,
     ingest_case,
     initialize_workspace,
+    list_cases,
     query_cases,
 )
 from omci.ai.rag.workspace import (
@@ -307,6 +310,7 @@ def main() -> None:
         help=f"Maximum issue cases to return (default: {DEFAULT_TOP_K})",
     )
     rag_subparsers.add_parser("status", help="Show RAG workspace status")
+    rag_subparsers.add_parser("cases", help="List all indexed issue cases")
     rag_subparsers.add_parser("profiles", help="List supported RAG profiles")
 
     # --- Sub-command: check ---
@@ -456,6 +460,19 @@ def main() -> None:
             print("No matching issue cases found.")
         else:
             print(format_query_results(results))
+    elif (
+        args.command == "ai"
+        and args.ai_command == "rag"
+        and args.rag_command == "cases"
+    ):
+        try:
+            cases = list_cases()
+        except RAGCasesError as exc:
+            parser.error(str(exc))
+        if not cases:
+            print("No indexed issue cases found.")
+        else:
+            print(format_case_summaries(cases))
     elif (
         args.command == "ai"
         and args.ai_command == "rag"

@@ -359,6 +359,93 @@ If the configured workspace path does not exist or does not contain valid
 workspace metadata, the command MUST fail without creating or modifying any
 files.
 
+### Cases
+
+#### Synopsis
+
+```text
+omcipcap ai rag cases
+```
+
+The `rag cases` command lists all indexed issue cases stored in the active RAG
+workspace.
+
+The command MUST resolve the active workspace from the global workspace
+configuration.
+
+#### Output
+
+The default output MUST use the following table format:
+
+```text
+CASE ID        CHUNKS  PROBLEM
+-------------  ------  -----------------------------------------------
+CASE-001       8       VEIP creation failure after MIB synchronization
+CASE-002       5       VLAN translation rule mismatch
+Xtelecom0002   6       TR-069 WAN IPHost provisioning failed
+```
+
+Output requirements:
+
+- `CASE ID` is the unique stored issue-case identifier.
+- `CHUNKS` is the total number of indexed semantic chunks belonging to the case.
+- `PROBLEM` is the extracted `Problem` section stored in the RAG metadata.
+- Cases MUST be sorted lexicographically by `CASE ID`.
+- Output formatting MUST be deterministic.
+
+If no issue cases have been indexed, the command MUST print:
+
+```text
+No indexed issue cases found.
+```
+
+#### Data Source
+
+The command MUST obtain information from the vector database.
+
+Issue cases MUST be aggregated by `case_id`.
+
+For each unique case:
+
+- `CHUNKS` is the number of semantic chunks having the same `case_id`.
+- `PROBLEM` is the stored problem summary associated with the case.
+
+The implementation MUST NOT parse stored Markdown documents to obtain the
+Problem section.
+
+The Problem summary MUST be read from metadata stored during `rag ingest`.
+
+#### Workflow
+
+The `rag cases` command MUST perform the following steps in order:
+
+1. Resolve and validate the active workspace.
+2. Validate database compatibility.
+3. Open the vector database.
+4. Aggregate indexed chunks by `case_id`.
+5. Display one row for each unique issue case.
+
+#### Restrictions
+
+The `rag cases` command MUST NOT:
+
+- modify the workspace
+- modify indexed issue cases
+- regenerate semantic chunks
+- re-run PCAP analysis
+- download embedding models
+- load embedding models
+- contact the Hugging Face Hub
+
+Users can inspect a listed issue case with:
+
+```text
+omcipcap ai rag show <case-id>
+```
+
+The `Problem` metadata MUST be identical for all chunks belonging to the same
+`case_id`.
+
 ---
 
 ## Profile Management

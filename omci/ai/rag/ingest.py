@@ -10,9 +10,13 @@ import tempfile
 from pathlib import Path
 
 from omci import omcimd, omciparser, omcisemantic
+from omci.ai.rag.database import (
+    COLLECTION_NAME,
+    RAGDatabaseError,
+    validate_collection_metadata,
+)
 from omci.ai.rag.semantic_units import SEMANTIC_UNIT_DEFINITIONS
 from omci.ai.rag.workspace import (
-    DB_SCHEMA_VERSION,
     PROFILE_CONFIGS,
     WorkspaceInitError,
     _load_ai_dependencies as _load_workspace_ai_dependencies,
@@ -22,7 +26,6 @@ from omci.ai.rag.workspace import (
 from omci.omci import load_omci_packets
 
 
-COLLECTION_NAME = "omcipcap_rag"
 REQUIRED_SECTIONS = (
     "Problem",
     "Root-Cause",
@@ -41,10 +44,27 @@ class RAGIngestError(Exception):
     """Raised when a RAG issue case cannot be ingested."""
 
 
+def extract_markdown_section(markdown: str, section_name: str) -> str:
+    pattern = re.compile(
+        rf"^##\s+{re.escape(section_name)}\s*$"
+        rf"(.*?)"
+        rf"(?=^##?\s+|\Z)",
+        re.MULTILINE | re.DOTALL | re.IGNORECASE,
+    )
+    match = pattern.search(markdown)
+    if match is None:
+        raise RAGIngestError(f"Missing required section: {section_name}")
+    content = match.group(1).strip()
+    if not content:
+        raise RAGIngestError(f"Section is empty: {section_name}")
+    return " ".join(content.split())
+
+
 def validate_issue_markdown(text: str) -> None:
-    sections: dict[str, list[str]] = {}
+    canonical_headings = {
+        heading.lower(): heading for heading in CANONICAL_SECTIONS
+    }
     section_counts: dict[str, int] = {}
-    current_section: str | None = None
     wrong_level: list[str] = []
 
     for line in text.splitlines():
@@ -52,16 +72,11 @@ def validate_issue_markdown(text: str) -> None:
         if match:
             level = len(match.group(1))
             heading = match.group(2)
-            if heading in CANONICAL_SECTIONS and level != 2:
-                wrong_level.append(heading)
-            if level == 2:
-                current_section = heading
-                sections.setdefault(current_section, [])
-                section_counts[heading] = section_counts.get(heading, 0) + 1
-            else:
-                current_section = None
-        elif current_section is not None:
-            sections[current_section].append(line)
+            canonical = canonical_headings.get(heading.lower())
+            if canonical is not None and level != 2:
+                wrong_level.append(canonical)
+            if canonical is not None and level == 2:
+                section_counts[canonical] = section_counts.get(canonical, 0) + 1
 
     if wrong_level:
         raise RAGIngestError(
@@ -69,7 +84,9 @@ def validate_issue_markdown(text: str) -> None:
             + ", ".join(sorted(set(wrong_level)))
         )
 
-    missing = [heading for heading in REQUIRED_SECTIONS if heading not in sections]
+    missing = [
+        heading for heading in REQUIRED_SECTIONS if heading not in section_counts
+    ]
     if missing:
         raise RAGIngestError(
             "Issue Markdown is missing required level-2 section(s): "
@@ -84,15 +101,15 @@ def validate_issue_markdown(text: str) -> None:
             "Issue Markdown has duplicate required section(s): " + ", ".join(duplicates)
         )
 
-    empty = [
-        heading
-        for heading in REQUIRED_SECTIONS
-        if not "\n".join(sections[heading]).strip()
-    ]
-    if empty:
-        raise RAGIngestError(
-            "Issue Markdown has empty required section(s): " + ", ".join(empty)
-        )
+    for heading in REQUIRED_SECTIONS:
+        try:
+            extract_markdown_section(text, heading)
+        except RAGIngestError as exc:
+            if "Section is empty" in str(exc):
+                raise RAGIngestError(
+                    f"Issue Markdown has empty required section(s): {heading}"
+                ) from exc
+            raise
 
 
 def make_chunk_id(case_id: str, semantic_unit: str, chunk_index: int) -> str:
@@ -198,6 +215,7 @@ def build_chunk_records(
     overlap_tokens: int,
     issue_file: str,
     pcap_file: str,
+    problem: str,
 ) -> tuple[list[str], list[str], list[dict[str, object]]]:
     ids: list[str] = []
     documents: list[str] = []
@@ -222,6 +240,7 @@ def build_chunk_records(
                     "priority": definition.priority,
                     "issue_file": issue_file,
                     "pcap_file": pcap_file,
+                    "problem": problem,
                 }
             )
     return ids, documents, metadatas
@@ -302,16 +321,12 @@ def _collection_for_workspace(
             f"Cannot open ChromaDB in '{workspace / 'db'}': {exc}"
         ) from exc
 
-    collection_metadata = collection.metadata or {}
-    if (
-        collection_metadata.get("hnsw:space") != "cosine"
-        or collection_metadata.get("db_schema_version") != DB_SCHEMA_VERSION
-        or collection_metadata.get("profile_id") != config["profile_id"]
-    ):
+    try:
+        validate_collection_metadata(collection.metadata, config)
+    except RAGDatabaseError as exc:
         raise RAGIngestError(
-            "RAG database metadata is incompatible with the active workspace "
-            "(profile or distance metric mismatch)"
-        )
+            str(exc)
+        ) from exc
     return collection
 
 
@@ -411,6 +426,7 @@ def ingest_case(
             f"Cannot read issue Markdown '{issue_path}': {exc}"
         ) from exc
     validate_issue_markdown(issue_text)
+    problem = extract_markdown_section(issue_text, "Problem")
 
     _load_workspace_analysis_resources(workspace)
     chromadb_module, _ = _load_ai_dependencies()
@@ -451,6 +467,7 @@ def ingest_case(
             int(profile_config["token_overlap"]),
             stored_issue.name,
             pcap_path.name,
+            problem,
         )
         vectors = model.encode(documents)
         embeddings = [[float(value) for value in vector] for vector in vectors]

@@ -7,6 +7,11 @@
 
 """RAG workspace support."""
 
+from omci.ai.rag.cases import (
+    RAGCasesError,
+    format_case_summaries,
+    list_cases,
+)
 from omci.ai.rag.ingest import RAGIngestError, ingest_case
 from omci.ai.rag.query import (
     DEFAULT_TOP_K,
@@ -20,15 +25,18 @@ from omci.ai.rag.workspace import initialize_workspace, resolve_workspace
 
 __all__ = [
     "RAGIngestError",
+    "RAGCasesError",
     "RAGQueryError",
     "RAGStatus",
     "DEFAULT_TOP_K",
     "MIN_SIMILARITY",
     "format_query_results",
+    "format_case_summaries",
     "get_active_profile",
     "get_rag_status",
     "ingest_case",
     "initialize_workspace",
+    "list_cases",
     "query_cases",
     "resolve_workspace",
 ]

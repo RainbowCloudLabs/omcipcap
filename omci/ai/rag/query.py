@@ -6,20 +6,17 @@
 # See LICENSE file in the project root for full license information.
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from omci.ai.rag.ingest import COLLECTION_NAME
+from omci.ai.rag.database import RAGDatabaseError, open_existing_collection
 from omci.ai.rag.workspace import (
-    DB_SCHEMA_VERSION,
     WorkspaceInitError,
-    _load_ai_dependencies,
     load_embedding_model,
     resolve_workspace,
 )
 
 
 DEFAULT_TOP_K = 5
-MIN_SIMILARITY = 0.70
+MIN_SIMILARITY = 0.50
 
 
 class RAGQueryError(Exception):
@@ -82,45 +79,6 @@ def _distance_to_similarity(distance: object) -> float:
     return 1.0 - float(distance)
 
 
-def _open_collection(
-    workspace: Path,
-    config: dict[str, object],
-) -> object | None:
-    db_path = workspace / "db"
-    if not db_path.exists():
-        raise RAGQueryError(f"RAG database is missing: '{db_path}'")
-    if not db_path.is_dir():
-        raise RAGQueryError(f"RAG database is invalid: '{db_path}' is not a directory")
-    if not any(db_path.iterdir()):
-        return None
-
-    try:
-        chromadb_module, _ = _load_ai_dependencies()
-        client = chromadb_module.PersistentClient(path=str(db_path))
-        collection = client.get_collection(name=COLLECTION_NAME)
-    except WorkspaceInitError as exc:
-        raise RAGQueryError(str(exc)) from exc
-    except Exception as exc:
-        raise RAGQueryError(f"RAG database is invalid: {exc}") from exc
-
-    metadata = collection.metadata
-    if not isinstance(metadata, dict):
-        raise RAGQueryError("RAG database metadata is missing or invalid")
-    if (
-        metadata.get("hnsw:space") != "cosine"
-        or metadata.get("db_schema_version") != DB_SCHEMA_VERSION
-        or metadata.get("profile_id") != config["profile_id"]
-    ):
-        raise RAGQueryError(
-            "RAG database metadata is incompatible with the active workspace "
-            "(profile or distance metric mismatch)"
-        )
-    version = metadata.get("omcipcap_version")
-    if not isinstance(version, str) or not version:
-        raise RAGQueryError("RAG database metadata is missing or invalid")
-    return collection
-
-
 def _parse_query_chunks(response: object) -> list[RankedChunk]:
     if not isinstance(response, dict):
         raise RAGQueryError("RAG database returned an invalid query result")
@@ -170,7 +128,10 @@ def query_cases(question: str, top_k: int = DEFAULT_TOP_K) -> list[QueryResult] 
     except WorkspaceInitError as exc:
         raise RAGQueryError(str(exc)) from exc
 
-    collection = _open_collection(workspace, config)
+    try:
+        collection = open_existing_collection(workspace, config)
+    except RAGDatabaseError as exc:
+        raise RAGQueryError(str(exc)) from exc
     if collection is None:
         return None
     try:

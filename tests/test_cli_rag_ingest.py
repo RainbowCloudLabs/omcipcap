@@ -15,6 +15,7 @@ from omci.ai.rag.ingest import (
     RAGIngestError,
     SEMANTIC_UNITS,
     build_chunk_records,
+    extract_markdown_section,
     ingest_case,
     make_chunk_id,
     split_semantic_unit,
@@ -260,6 +261,7 @@ def test_successful_ingestion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
             "priority": priority,
             "issue_file": "CASE-001.md",
             "pcap_file": "sample.pcap",
+            "problem": "Service is unavailable.",
         }
 
 
@@ -501,6 +503,54 @@ def test_all_required_sections_present() -> None:
     validate_issue_markdown(issue_markdown())
 
 
+def test_extract_problem_section_normalizes_multiline_content() -> None:
+    markdown = (
+        "# CASE-001\n\n"
+        "## Problem\n\n"
+        "The ONU completes MIB synchronization, but the expected VEIP\n"
+        "managed entity is   not created.\n\n"
+        "Subscriber service fails.\n\n"
+        "## Environment\nVendor: Example\n"
+    )
+
+    assert extract_markdown_section(markdown, "Problem") == (
+        "The ONU completes MIB synchronization, but the expected VEIP managed "
+        "entity is not created. Subscriber service fails."
+    )
+
+
+def test_extract_problem_stops_before_next_level_two_heading() -> None:
+    markdown = "## Problem\nFailure text.\n\n## Environment\nVendor: Example\n"
+
+    problem = extract_markdown_section(markdown, "Problem")
+
+    assert problem == "Failure text."
+    assert "Environment" not in problem
+
+
+def test_extract_problem_stops_before_next_level_one_heading() -> None:
+    markdown = "## Problem\nFailure text.\n\n# Another Case\nOther text\n"
+
+    assert extract_markdown_section(markdown, "Problem") == "Failure text."
+
+
+def test_extract_problem_heading_is_case_insensitive() -> None:
+    assert (
+        extract_markdown_section("## pRoBlEm\nFailure text.\n", "Problem")
+        == "Failure text."
+    )
+
+
+def test_extract_problem_rejects_missing_section() -> None:
+    with pytest.raises(RAGIngestError, match="Missing required section: Problem"):
+        extract_markdown_section("## Environment\nVendor: Example\n", "Problem")
+
+
+def test_extract_problem_rejects_empty_section() -> None:
+    with pytest.raises(RAGIngestError, match="Section is empty: Problem"):
+        extract_markdown_section("## Problem\n \n## Environment\nVendor\n", "Problem")
+
+
 def test_missing_required_section() -> None:
     text = issue_markdown().replace("## Solution", "## Workaround")
 
@@ -620,6 +670,30 @@ def test_duplicate_case_replaced(
     assert "old-stale-id" not in collection.records
     assert len(collection.records) == len(SEMANTIC_UNITS)
     assert (workspace / "issues" / "CASE-001.md").read_text() == issue_markdown()
+
+
+def test_replacement_updates_problem_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, issue_path, pcap_path, collection, _ = prepare_ingest(
+        tmp_path, monkeypatch
+    )
+    assert ingest_case("CASE-001", issue_path, pcap_path)
+
+    issue_path.write_text(
+        issue_markdown().replace(
+            "Service is unavailable.",
+            "Updated multiline\nproblem description.",
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+
+    assert ingest_case("CASE-001", issue_path, pcap_path)
+    assert {
+        record["metadata"]["problem"]
+        for record in collection.records.values()
+    } == {"Updated multiline problem description."}
 
 
 def test_failed_replacement_restores_previous_case(
@@ -756,6 +830,7 @@ def test_chunk_indices_are_sequential_per_semantic_unit() -> None:
         2,
         "CASE-001.md",
         "sample.pcap",
+        "Problem summary",
     )
 
     issue_indices = [
@@ -804,6 +879,7 @@ def test_all_chunks_from_one_semantic_unit_share_priority() -> None:
         2,
         "CASE-001.md",
         "sample.pcap",
+        "Problem summary",
     )
 
     assert len(metadatas) > 1
@@ -826,6 +902,7 @@ def test_flattened_semantic_unit_order_is_preserved() -> None:
         2,
         "CASE-001.md",
         "sample.pcap",
+        "Problem summary",
     )
 
     units = [metadata["semantic_unit"] for metadata in metadatas]
@@ -852,6 +929,7 @@ def test_empty_semantic_units_are_skipped() -> None:
         2,
         "CASE-001.md",
         "sample.pcap",
+        "Problem summary",
     )
 
     assert ids == ["CASE-001:issue_summary:0"]
