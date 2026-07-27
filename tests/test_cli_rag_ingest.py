@@ -154,8 +154,13 @@ class FakeSentenceTransformer:
 
 
 class SingleTokenTokenizer:
-    def encode(self, text: str, add_special_tokens: bool = False) -> list[int]:
-        del add_special_tokens
+    def encode(
+        self,
+        text: str,
+        add_special_tokens: bool = False,
+        **kwargs: object,
+    ) -> list[int]:
+        del add_special_tokens, kwargs
         return [] if not text else [1]
 
     def decode(
@@ -169,8 +174,13 @@ class SingleTokenTokenizer:
 
 
 class CharacterTokenizer:
-    def encode(self, text: str, add_special_tokens: bool = False) -> list[int]:
-        del add_special_tokens
+    def encode(
+        self,
+        text: str,
+        add_special_tokens: bool = False,
+        **kwargs: object,
+    ) -> list[int]:
+        del add_special_tokens, kwargs
         return [ord(character) for character in text]
 
     def decode(

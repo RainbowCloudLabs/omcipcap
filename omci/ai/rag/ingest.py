@@ -100,7 +100,14 @@ def make_chunk_id(case_id: str, semantic_unit: str, chunk_index: int) -> str:
 
 
 def _encode_tokens(text: str, tokenizer: object) -> list[int]:
-    token_ids = tokenizer.encode(text, add_special_tokens=False)
+    # Suppress Hugging Face "sequence length > model_max_length" warnings.
+    # The full token sequence is intentionally encoded here only for custom
+    # chunking and is never passed directly to the embedding model.
+    token_ids = tokenizer.encode(
+        text,
+        add_special_tokens=False,
+        verbose=False,
+    )
     return [int(token_id) for token_id in token_ids]
 
 
