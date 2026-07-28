@@ -15,7 +15,7 @@ from omci.ai.rag.ingest import (
     RAGIngestError,
     SEMANTIC_UNITS,
     build_chunk_records,
-    compose_service_path,
+    compose_md_sections,
     extract_markdown_section,
     ingest_case,
     make_chunk_id,
@@ -32,7 +32,9 @@ from omci.ai.rag.workspace import (
 
 
 def issue_markdown(include_environment: bool = True) -> str:
-    environment = "## Environment\nONU Vendor: Example\n\n" if include_environment else ""
+    environment = (
+        "## Environment\nONU Vendor: Example\n\n" if include_environment else ""
+    )
     return (
         "## Problem\nService is unavailable.\n\n"
         f"{environment}"
@@ -57,12 +59,15 @@ def semantic_units(issue_text: str) -> dict[str, str]:
 
 
 def test_compose_service_path_skips_empty_sections() -> None:
-    assert compose_service_path(
-        "  ## VLAN\n\nVLAN data\n",
-        "",
-        "   \n",
-        "\n## Topology\n\nTopology data  ",
-    ) == "## VLAN\n\nVLAN data\n\n## Topology\n\nTopology data"
+    assert (
+        compose_md_sections(
+            "  ## VLAN\n\nVLAN data\n",
+            "",
+            "   \n",
+            "\n## Topology\n\nTopology data  ",
+        )
+        == "## VLAN\n\nVLAN data\n\n## Topology\n\nTopology data"
+    )
 
 
 def test_analyze_pcap_builds_complete_service_path(
@@ -90,8 +95,12 @@ def test_analyze_pcap_builds_complete_service_path(
         value: object,
         only_upload: bool = False,
         only_vendor: bool = False,
+        class_ids: list[int] | None = None,
     ) -> str:
         assert value is packets
+
+        if class_ids == [256, 257]:
+            return "core-mib"
         if only_upload:
             return "upload-data"
         if only_vendor:
@@ -152,11 +161,11 @@ def test_analyze_pcap_builds_complete_service_path(
     assert result == {
         "issue_summary": "ISSUE",
         "failed_check_results": "CHECK",
-        "core_mib_summary": "MIB:full-data:True",
+        "core_mib_summary": "MIB:full-data:True\n\nMIB:core-mib:False",
         "service_path": "## VLAN\n\n## T-CONT Flow\n\n## Topology",
-        "upload_mib": "MIB:upload-data:True",
-        "vendor_specific_mib": "MIB:vendor-data:True",
-        "full_mib": "MIB:full-data:True",
+        "upload_mib": "MIB:upload-data:False",
+        "vendor_specific_mib": "MIB:vendor-data:False",
+        "full_mib": "MIB:full-data:False",
     }
     assert renderer_inputs == [
         ("vlan", vlan_data),
@@ -253,7 +262,10 @@ class FakeModel:
         self.tokenizer = SingleTokenTokenizer()
 
     def encode(self, documents: list[str]) -> list[list[float]]:
-        return [[float(index), float(len(document))] for index, document in enumerate(documents)]
+        return [
+            [float(index), float(len(document))]
+            for index, document in enumerate(documents)
+        ]
 
 
 class FakeSentenceTransformer:
@@ -351,9 +363,9 @@ def test_successful_ingestion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 
     assert ingest_case("CASE-001", issue_path, pcap_path)
 
-    assert (
-        workspace / "issues" / "CASE-001.md"
-    ).read_text(encoding="utf-8") == issue_markdown()
+    assert (workspace / "issues" / "CASE-001.md").read_text(
+        encoding="utf-8"
+    ) == issue_markdown()
     assert chroma.paths == [workspace / "db"]
     assert collection.metadata["hnsw:space"] == "cosine"
     assert list(collection.records) == [
@@ -722,8 +734,7 @@ def test_additional_section_is_preserved(
 
 @pytest.mark.parametrize("answer", ["n", "N", "", "anything"])
 def test_duplicate_case_cancelled(
-    answer: str,
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    answer: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace, issue_path, pcap_path, collection, _ = prepare_ingest(
         tmp_path, monkeypatch
@@ -802,8 +813,7 @@ def test_replacement_updates_problem_metadata(
 
     assert ingest_case("CASE-001", issue_path, pcap_path)
     assert {
-        record["metadata"]["problem"]
-        for record in collection.records.values()
+        record["metadata"]["problem"] for record in collection.records.values()
     } == {"Updated multiline problem description."}
 
 
@@ -851,12 +861,10 @@ def test_failed_replacement_restores_previous_case(
 
 def test_chunk_ids_are_deterministic() -> None:
     first = [
-        make_chunk_id("CASE-001", semantic_unit, 0)
-        for semantic_unit in SEMANTIC_UNITS
+        make_chunk_id("CASE-001", semantic_unit, 0) for semantic_unit in SEMANTIC_UNITS
     ]
     second = [
-        make_chunk_id("CASE-001", semantic_unit, 0)
-        for semantic_unit in SEMANTIC_UNITS
+        make_chunk_id("CASE-001", semantic_unit, 0) for semantic_unit in SEMANTIC_UNITS
     ]
 
     assert first == second
@@ -921,8 +929,7 @@ def test_all_chunks_remain_under_token_limit() -> None:
     chunks = split_semantic_unit("abcdefghijklmnopqrstuvwxyz", tokenizer, 7, 2)
 
     assert all(
-        len(tokenizer.encode(chunk, add_special_tokens=False)) <= 7
-        for chunk in chunks
+        len(tokenizer.encode(chunk, add_special_tokens=False)) <= 7 for chunk in chunks
     )
 
 
@@ -1045,9 +1052,7 @@ def test_empty_semantic_units_are_skipped() -> None:
 
     assert ids == ["CASE-001:issue_summary:0"]
     assert documents == ["content"]
-    assert [metadata["semantic_unit"] for metadata in metadatas] == [
-        "issue_summary"
-    ]
+    assert [metadata["semantic_unit"] for metadata in metadatas] == ["issue_summary"]
 
 
 def test_paragraph_boundaries_are_preferred() -> None:
@@ -1131,6 +1136,6 @@ def test_ai_dependency_unavailable_has_clear_error(
 
     with pytest.raises(
         RAGIngestError,
-        match=r'(?s)AI dependencies are not installed.*omcipcap\[ai\]',
+        match=r"(?s)AI dependencies are not installed.*omcipcap\[ai\]",
     ):
         rag_ingest._load_ai_dependencies()

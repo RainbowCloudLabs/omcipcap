@@ -61,9 +61,7 @@ def extract_markdown_section(markdown: str, section_name: str) -> str:
 
 
 def validate_issue_markdown(text: str) -> None:
-    canonical_headings = {
-        heading.lower(): heading for heading in CANONICAL_SECTIONS
-    }
+    canonical_headings = {heading.lower(): heading for heading in CANONICAL_SECTIONS}
     section_counts: dict[str, int] = {}
     wrong_level: list[str] = []
 
@@ -282,11 +280,9 @@ def _load_workspace_analysis_resources(workspace: Path) -> None:
         raise RAGIngestError(f"Failed to load semantic plugins from '{semantics_dir}'")
 
 
-def compose_service_path(*sections: str) -> str:
+def compose_md_sections(*sections: str) -> str:
     return "\n\n".join(
-        section.strip()
-        for section in sections
-        if section and section.strip()
+        section.strip() for section in sections if section and section.strip()
     )
 
 
@@ -296,24 +292,29 @@ def _analyze_pcap(pcap_path: Path, issue_text: str) -> dict[str, str]:
     upload_data = omciparser.get_mib_db_data(packets, only_upload=True)
     full_data = omciparser.get_mib_db_data(packets)
     vendor_data = omciparser.get_mib_db_data(packets, only_vendor=True)
+    core_mib_data = omciparser.get_mib_db_data(packets, class_ids=[256, 257])
     full_mib = omciparser.get_all_mib_db(packets)
     vlan_data = omciparser.get_vlan_data(full_mib)
     flow_data = omciparser.get_flow_data(full_mib)
     topology_data = omciparser.get_topology_data(packets)
-    service_path = compose_service_path(
+    service_path = compose_md_sections(
         omcimd.render_vlan_md(vlan_data),
         omcimd.render_tcont_flow_md(flow_data),
         omcimd.render_topology_md(topology_data),
+    )
+    core_mib_summary = compose_md_sections(
+        omcimd.render_mibdb_md(full_data, short=True),
+        omcimd.render_mibdb_md(core_mib_data, short=False),
     )
 
     return {
         "issue_summary": issue_text,
         "failed_check_results": omcimd.render_check_md(check_data),
-        "core_mib_summary": omcimd.render_mibdb_md(full_data, short=True),
+        "core_mib_summary": core_mib_summary,
         "service_path": service_path,
-        "upload_mib": omcimd.render_mibdb_md(upload_data, short=True),
-        "vendor_specific_mib": omcimd.render_mibdb_md(vendor_data, short=True),
-        "full_mib": omcimd.render_mibdb_md(full_data, short=True),
+        "upload_mib": omcimd.render_mibdb_md(upload_data, short=False),
+        "vendor_specific_mib": omcimd.render_mibdb_md(vendor_data, short=False),
+        "full_mib": omcimd.render_mibdb_md(full_data, short=False),
     }
 
 
@@ -339,9 +340,7 @@ def _collection_for_workspace(
     try:
         validate_collection_metadata(collection.metadata, config)
     except RAGDatabaseError as exc:
-        raise RAGIngestError(
-            str(exc)
-        ) from exc
+        raise RAGIngestError(str(exc)) from exc
     return collection
 
 
