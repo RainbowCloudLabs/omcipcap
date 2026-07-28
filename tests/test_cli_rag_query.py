@@ -64,18 +64,27 @@ class FakeCollection:
         *,
         query_embeddings: list[list[float]],
         n_results: int,
+        where: dict[str, object],
         include: list[str],
     ) -> dict[str, object]:
         self.queries.append(
             {
                 "query_embeddings": query_embeddings,
                 "n_results": n_results,
+                "where": where,
                 "include": include,
             }
         )
+        records = self.records
+        if where == {"semantic_unit": {"$ne": "full_mib"}}:
+            records = [
+                record
+                for record in records
+                if record[0].get("semantic_unit") != "full_mib"
+            ]
         return {
-            "metadatas": [[metadata for metadata, _ in self.records]],
-            "distances": [[distance for _, distance in self.records]],
+            "metadatas": [[metadata for metadata, _ in records]],
+            "distances": [[distance for _, distance in records]],
         }
 
 
@@ -247,9 +256,32 @@ def test_query_resolves_workspace_and_generates_embedding(
         {
             "query_embeddings": [[0.25, 0.75]],
             "n_results": 1,
+            "where": {"semantic_unit": {"$ne": "full_mib"}},
             "include": ["metadatas", "distances"],
         }
     ]
+
+
+def test_query_excludes_full_mib_during_vector_search(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    full_mib_metadata = metadata("CASE-FULL")
+    full_mib_metadata["semantic_unit"] = "full_mib"
+    collection = FakeCollection(
+        [
+            (full_mib_metadata, 0.01),
+            (metadata("CASE-SUMMARY"), 0.10),
+        ]
+    )
+    install_query_dependencies(workspace, monkeypatch, collection)
+
+    results = query_cases("service failure")
+
+    assert results == [QueryResult("CASE-SUMMARY", 0.90)]
+    assert collection.queries[0]["where"] == {
+        "semantic_unit": {"$ne": "full_mib"}
+    }
 
 
 def test_query_missing_workspace(

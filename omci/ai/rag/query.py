@@ -159,6 +159,7 @@ def query_cases(question: str, top_k: int = DEFAULT_TOP_K) -> list[QueryResult] 
         response = collection.query(
             query_embeddings=[query_embedding],
             n_results=chunk_count,
+            where={"semantic_unit": {"$ne": "full_mib"}},
             include=["metadatas", "distances"],
         )
     except RAGQueryError:
