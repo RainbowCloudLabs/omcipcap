@@ -16,7 +16,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  base:
+    name: Base (Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
 
     strategy:
@@ -41,9 +42,46 @@ jobs:
         pip install -e .
         pip install pytest
 
-    - name: Run Pytest
+    - name: Verify RAG dependencies are not installed
+      run: python -c "import importlib.util; assert importlib.util.find_spec('chromadb') is None"
+
+    - name: Run base tests
       env:
         COLUMNS: 250
         TERM: xterm-256color
+      run: pytest -v --ignore-glob="tests/test_cli_rag_*.py"
+
+  rag:
+    name: RAG (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Display Python version
+      run: python -c "import sys; print(sys.version)"
+
+    - name: Install dependencies
       run: |
-        pytest -v
+        python -m pip install --upgrade pip
+        pip install -e ".[rag]"
+        pip install pytest
+
+    - name: Verify RAG dependencies are installed
+      run: python -c "import chromadb"
+
+    - name: Run RAG tests
+      env:
+        COLUMNS: 250
+        TERM: xterm-256color
+      run: pytest -v tests/test_cli_rag_*.py

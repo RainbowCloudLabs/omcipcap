@@ -64,7 +64,7 @@ checks the Hugging Face Hub for updates. If the cached model is missing, rerun
 Install the optional AI dependencies before ingestion:
 
 ```text
-pip install "omcipcap[ai]"
+pip install "omcipcap[rag]"
 ```
 
 RAG query, rebuild, list, and show commands are not implemented yet.

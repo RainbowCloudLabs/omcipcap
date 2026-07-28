@@ -18,7 +18,7 @@ authors = [
 ]
 
 [project.optional-dependencies]
-ai = [
+rag = [
     "chromadb>=1.5,<2.0",
     "sentence-transformers>=3.0.0",
 ]

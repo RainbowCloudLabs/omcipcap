@@ -7,6 +7,13 @@
 
 """RAG workspace support."""
 
+
+def _ensure_dependencies_available() -> None:
+    """Raise ImportError when the optional RAG dependencies are unavailable."""
+    import chromadb  # noqa: F401
+    import sentence_transformers  # noqa: F401
+
+
 from omci.ai.rag.cases import (
     RAGCasesError,
     format_case_summaries,

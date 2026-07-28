@@ -664,7 +664,7 @@ Example:
 
 ```toml
 [project.optional-dependencies]
-ai = [
+rag = [
     "chromadb>=1.5,<2.0",
     "sentence-transformers>=3.0.0",
 ]
@@ -673,7 +673,7 @@ ai = [
 Users who require AI features should install:
 
 ```bash
-pip install "omcipcap[ai]"
+pip install "omcipcap[rag]"
 ```
 
 This design keeps the core package lightweight and avoids installing large AI

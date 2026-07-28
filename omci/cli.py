@@ -17,26 +17,35 @@ from omci import omcisemantic
 from omci import omcirich
 from omci import omcimd
 from omci import overview
-from omci.ai.rag import (
-    DEFAULT_TOP_K,
-    RAGCasesError,
-    RAGIngestError,
-    RAGQueryError,
-    format_case_summaries,
-    format_query_results,
-    get_active_profile,
-    get_rag_status,
-    ingest_case,
-    initialize_workspace,
-    list_cases,
-    query_cases,
-)
-from omci.ai.rag.workspace import (
-    PROFILE_CONFIGS,
-    SUPPORTED_PROFILES,
-    WorkspaceInitError,
-)
 from omci.omci import load_omci_packets
+
+try:
+    import omci.ai.rag as rag
+
+    rag._ensure_dependencies_available()
+except ImportError:
+    rag_available = False
+else:
+    rag_available = True
+    from omci.ai.rag import (
+        DEFAULT_TOP_K,
+        RAGCasesError,
+        RAGIngestError,
+        RAGQueryError,
+        format_case_summaries,
+        format_query_results,
+        get_active_profile,
+        get_rag_status,
+        ingest_case,
+        initialize_workspace,
+        list_cases,
+        query_cases,
+    )
+    from omci.ai.rag.workspace import (
+        PROFILE_CONFIGS,
+        SUPPORTED_PROFILES,
+        WorkspaceInitError,
+    )
 
 
 def _positive_int(value: str) -> int:
@@ -276,42 +285,49 @@ def main() -> None:
         dest="command", help="Available analysis commands"
     )
 
-    # --- Sub-command: ai rag init ---
-    ai_p = subparsers.add_parser("ai", help="AI-assisted analysis commands")
-    ai_subparsers = ai_p.add_subparsers(dest="ai_command")
-    rag_p = ai_subparsers.add_parser("rag", help="RAG workspace commands")
-    rag_subparsers = rag_p.add_subparsers(dest="rag_command")
-    rag_init_p = rag_subparsers.add_parser("init", help="Initialize a RAG workspace")
-    rag_init_p.add_argument(
-        "--profile",
-        required=True,
-        choices=SUPPORTED_PROFILES,
-        help="RAG profile",
-    )
-    rag_init_p.add_argument(
-        "--dir", required=True, dest="workdir", help="RAG workspace directory"
-    )
-    rag_ingest_p = rag_subparsers.add_parser(
-        "ingest", help="Ingest an issue case into the RAG workspace"
-    )
-    rag_ingest_p.add_argument("--case-id", required=True, help="Issue case identifier")
-    rag_ingest_p.add_argument(
-        "--issue-md", required=True, help="Issue Markdown file"
-    )
-    rag_ingest_p.add_argument("pcap", help="Path to pcap file")
-    rag_query_p = rag_subparsers.add_parser(
-        "query", help="Search indexed RAG issue cases"
-    )
-    rag_query_p.add_argument("question", help="Natural-language search question")
-    rag_query_p.add_argument(
-        "--top-k",
-        type=_positive_int,
-        default=DEFAULT_TOP_K,
-        help=f"Maximum issue cases to return (default: {DEFAULT_TOP_K})",
-    )
-    rag_subparsers.add_parser("status", help="Show RAG workspace status")
-    rag_subparsers.add_parser("cases", help="List all indexed issue cases")
-    rag_subparsers.add_parser("profiles", help="List supported RAG profiles")
+    if rag_available:
+        # --- Sub-command: ai rag init ---
+        ai_p = subparsers.add_parser("ai", help="AI-assisted analysis commands")
+        ai_subparsers = ai_p.add_subparsers(dest="ai_command")
+        rag_p = ai_subparsers.add_parser("rag", help="RAG workspace commands")
+        rag_subparsers = rag_p.add_subparsers(dest="rag_command")
+        rag_init_p = rag_subparsers.add_parser(
+            "init", help="Initialize a RAG workspace"
+        )
+        rag_init_p.add_argument(
+            "--profile",
+            required=True,
+            choices=SUPPORTED_PROFILES,
+            help="RAG profile",
+        )
+        rag_init_p.add_argument(
+            "--dir", required=True, dest="workdir", help="RAG workspace directory"
+        )
+        rag_ingest_p = rag_subparsers.add_parser(
+            "ingest", help="Ingest an issue case into the RAG workspace"
+        )
+        rag_ingest_p.add_argument(
+            "--case-id", required=True, help="Issue case identifier"
+        )
+        rag_ingest_p.add_argument(
+            "--issue-md", required=True, help="Issue Markdown file"
+        )
+        rag_ingest_p.add_argument("pcap", help="Path to pcap file")
+        rag_query_p = rag_subparsers.add_parser(
+            "query", help="Search indexed RAG issue cases"
+        )
+        rag_query_p.add_argument(
+            "question", help="Natural-language search question"
+        )
+        rag_query_p.add_argument(
+            "--top-k",
+            type=_positive_int,
+            default=DEFAULT_TOP_K,
+            help=f"Maximum issue cases to return (default: {DEFAULT_TOP_K})",
+        )
+        rag_subparsers.add_parser("status", help="Show RAG workspace status")
+        rag_subparsers.add_parser("cases", help="List all indexed issue cases")
+        rag_subparsers.add_parser("profiles", help="List supported RAG profiles")
 
     # --- Sub-command: check ---
     check_p = subparsers.add_parser(
