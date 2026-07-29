@@ -46,7 +46,7 @@ class RAGIngestError(Exception):
 
 def extract_markdown_section(markdown: str, section_name: str) -> str:
     pattern = re.compile(
-        rf"^##\s+{re.escape(section_name)}\s*$"
+        rf"^#\s+{re.escape(section_name)}\s*$"
         rf"(.*?)"
         rf"(?=^##?\s+|\Z)",
         re.MULTILINE | re.DOTALL | re.IGNORECASE,
@@ -71,14 +71,14 @@ def validate_issue_markdown(text: str) -> None:
             level = len(match.group(1))
             heading = match.group(2)
             canonical = canonical_headings.get(heading.lower())
-            if canonical is not None and level != 2:
+            if canonical is not None and level != 1:
                 wrong_level.append(canonical)
-            if canonical is not None and level == 2:
+            if canonical is not None and level == 1:
                 section_counts[canonical] = section_counts.get(canonical, 0) + 1
 
     if wrong_level:
         raise RAGIngestError(
-            "Issue Markdown section(s) must use level-2 headings: "
+            "Issue Markdown section(s) must use level-1 headings: "
             + ", ".join(sorted(set(wrong_level)))
         )
 

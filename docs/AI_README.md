@@ -49,7 +49,7 @@ omcipcap ai rag ingest \
     sample.pcap
 ```
 
-The issue document must contain non-empty level-2 `Problem`, `Root-Cause`,
+The issue document must contain non-empty level-1 `Problem`, `Root-Cause`,
 `Trigger-Condition`, `How-To-Identify`, and `Solution` sections. `Environment`
 and additional sections are optional. The stored issue is written to
 `issues/<case-id>.md`, and its semantic chunks are stored in ChromaDB under

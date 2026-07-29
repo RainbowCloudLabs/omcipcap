@@ -33,15 +33,15 @@ from omci.ai.rag.workspace import (
 
 def issue_markdown(include_environment: bool = True) -> str:
     environment = (
-        "## Environment\nONU Vendor: Example\n\n" if include_environment else ""
+        "# Environment\nONU Vendor: Example\n\n" if include_environment else ""
     )
     return (
-        "## Problem\nService is unavailable.\n\n"
+        "# Problem\nService is unavailable.\n\n"
         f"{environment}"
-        "## Root-Cause\nIncorrect VLAN rule.\n\n"
-        "## Trigger-Condition\nONU reboot.\n\n"
-        "## How-To-Identify\nCheck the VLAN operation table.\n\n"
-        "## Solution\nCorrect the VLAN rule.\n\n"
+        "# Root-Cause\nIncorrect VLAN rule.\n\n"
+        "# Trigger-Condition\nONU reboot.\n\n"
+        "# How-To-Identify\nCheck the VLAN operation table.\n\n"
+        "# Solution\nCorrect the VLAN rule.\n\n"
         "## Notes\nPreserve this additional section.\n"
     )
 
@@ -628,12 +628,11 @@ def test_all_required_sections_present() -> None:
 
 def test_extract_problem_section_normalizes_multiline_content() -> None:
     markdown = (
-        "# CASE-001\n\n"
-        "## Problem\n\n"
+        "# Problem\n\n"
         "The ONU completes MIB synchronization, but the expected VEIP\n"
         "managed entity is   not created.\n\n"
         "Subscriber service fails.\n\n"
-        "## Environment\nVendor: Example\n"
+        "# Environment\nVendor: Example\n"
     )
 
     assert extract_markdown_section(markdown, "Problem") == (
@@ -643,7 +642,7 @@ def test_extract_problem_section_normalizes_multiline_content() -> None:
 
 
 def test_extract_problem_stops_before_next_level_two_heading() -> None:
-    markdown = "## Problem\nFailure text.\n\n## Environment\nVendor: Example\n"
+    markdown = "# Problem\nFailure text.\n\n## Diagnostic Notes\nVendor: Example\n"
 
     problem = extract_markdown_section(markdown, "Problem")
 
@@ -652,30 +651,30 @@ def test_extract_problem_stops_before_next_level_two_heading() -> None:
 
 
 def test_extract_problem_stops_before_next_level_one_heading() -> None:
-    markdown = "## Problem\nFailure text.\n\n# Another Case\nOther text\n"
+    markdown = "# Problem\nFailure text.\n\n# Another Case\nOther text\n"
 
     assert extract_markdown_section(markdown, "Problem") == "Failure text."
 
 
 def test_extract_problem_heading_is_case_insensitive() -> None:
     assert (
-        extract_markdown_section("## pRoBlEm\nFailure text.\n", "Problem")
+        extract_markdown_section("#   pRoBlEm   \t\nFailure text.\n", "Problem")
         == "Failure text."
     )
 
 
 def test_extract_problem_rejects_missing_section() -> None:
     with pytest.raises(RAGIngestError, match="Missing required section: Problem"):
-        extract_markdown_section("## Environment\nVendor: Example\n", "Problem")
+        extract_markdown_section("# Environment\nVendor: Example\n", "Problem")
 
 
 def test_extract_problem_rejects_empty_section() -> None:
     with pytest.raises(RAGIngestError, match="Section is empty: Problem"):
-        extract_markdown_section("## Problem\n \n## Environment\nVendor\n", "Problem")
+        extract_markdown_section("# Problem\n \n## Diagnostic Notes\nVendor\n", "Problem")
 
 
 def test_missing_required_section() -> None:
-    text = issue_markdown().replace("## Solution", "## Workaround")
+    text = issue_markdown().replace("# Solution", "# Workaround")
 
     with pytest.raises(RAGIngestError, match="Solution"):
         validate_issue_markdown(text)
@@ -683,8 +682,8 @@ def test_missing_required_section() -> None:
 
 def test_empty_required_section() -> None:
     text = issue_markdown().replace(
-        "## Root-Cause\nIncorrect VLAN rule.",
-        "## Root-Cause\n   ",
+        "# Root-Cause\nIncorrect VLAN rule.",
+        "# Root-Cause\n   ",
     )
 
     with pytest.raises(RAGIngestError, match="Root-Cause"):
@@ -692,14 +691,17 @@ def test_empty_required_section() -> None:
 
 
 def test_wrong_required_heading_level() -> None:
-    text = issue_markdown().replace("## Solution", "### Solution")
+    text = issue_markdown().replace("# Solution", "## Solution")
 
-    with pytest.raises(RAGIngestError, match="level-2.*Solution"):
+    with pytest.raises(
+        RAGIngestError,
+        match="Issue Markdown section\\(s\\) must use level-1 headings: Solution",
+    ):
         validate_issue_markdown(text)
 
 
 def test_duplicate_required_section() -> None:
-    text = issue_markdown() + "\n## Problem\nDuplicate problem.\n"
+    text = issue_markdown() + "\n# Problem\nDuplicate problem.\n"
 
     with pytest.raises(RAGIngestError, match="duplicate.*Problem"):
         validate_issue_markdown(text)
@@ -713,10 +715,13 @@ def test_optional_environment_may_be_present() -> None:
     validate_issue_markdown(issue_markdown(include_environment=True))
 
 
-def test_environment_must_use_level_two_heading() -> None:
-    text = issue_markdown().replace("## Environment", "### Environment")
+def test_environment_must_use_level_one_heading() -> None:
+    text = issue_markdown().replace("# Environment", "## Environment")
 
-    with pytest.raises(RAGIngestError, match="level-2.*Environment"):
+    with pytest.raises(
+        RAGIngestError,
+        match="Issue Markdown section\\(s\\) must use level-1 headings: Environment",
+    ):
         validate_issue_markdown(text)
 
 
