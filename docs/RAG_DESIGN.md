@@ -79,11 +79,11 @@ All RAG implementations MUST follow the latest schema defined in
 The RAG subsystem is specified by the following documents:
 
 - `RAG_CLI.md`
-- `RAG_DB_SCHEMA.md`
+- `RAG_DB_DESIGN.md`
 
 This document describes the overall architecture and design goals.
 Command-line behavior is defined in `RAG_CLI.md`.
-Database persistence is defined in `RAG_DB_SCHEMA.md`.
+Database persistence is defined in `RAG_DB_DESIGN.md`.
 
 ## Workspace Layout
 
@@ -93,19 +93,40 @@ A RAG workspace contains:
 <workspace>/
 ├── db/
 ├── cases/
+├── pcaps/
 ├── mib-json/
 ├── semantics/
-└── workspace.json
+└── config.json
 ```
 
 - `db/` contains the persistent ChromaDB database.
-- `cases/` contains stored issue-case Markdown documents and source artifacts.
+- `cases/` contains stored issue-case Markdown documents.
+- `pcaps/` contains source PCAP or PCAPNG files associated with issue cases.
 - `mib-json/` contains vendor-specific MIB JSON definitions.
 - `semantics/` contains Python semantic plugins used by OMCI analysis.
-- `workspace.json` contains workspace metadata.
+- `config.json` contains workspace configuration.
 
-The `mib-json/` and `semantics/` directories MUST be created by `rag init`,
-even when they are initially empty.
+The `cases/`, `pcaps/`, `mib-json/`, and `semantics/` directories MUST be
+created by `rag init`, even when they are initially empty.
+
+### Issue Case Artifacts
+
+The current workspace design associates one stored issue Markdown document and
+one stored PCAP or PCAPNG file with each issue case.
+
+Chroma chunk metadata records both artifacts using workspace-relative paths:
+
+```text
+issue_file = cases/case_01_olt_disply_confi_fail.md
+pcap_file = pcaps/case_01_olt_disply_confi_fail.pcap
+```
+
+`issue_file` and `pcap_file` MUST NOT contain absolute paths. The stored values
+identify the actual workspace artifacts selected during ingestion. Consumers
+MUST use the metadata values and MUST NOT derive either path or filename from
+`case_id`.
+
+The detailed chunk metadata schema is defined in `RAG_DB_DESIGN.md`.
 
 ### Workspace Analysis Resources
 
@@ -267,20 +288,26 @@ Profiles define the indexing and retrieval characteristics of the RAG
 subsystem.
 
 The selected profile and workspace creation information are stored in the
-collection metadata.
+workspace `config.json`:
 
 ```json
 {
   "db_schema_version": 1,
   "profile_id": "standard",
-  "omcipcap_version": "0.3.8"
+  "omcipcap_version": "0.3.8",
+  "created_at": "2026-07-29T12:00:00+00:00"
 }
 ```
 
 - `db_schema_version` identifies the database schema version.
 - `profile_id` identifies the profile used to build the database.
 - `omcipcap_version` records the OMCIPcap version that created the database.
-  A future rebuild implementation may update these fields.
+- `created_at` records the workspace creation time as a timezone-aware
+  timestamp.
+
+The Chroma collection stores the compatible schema, profile, and OMCIPcap
+version fields defined in `RAG_DB_DESIGN.md`. A future rebuild implementation
+may update the collection metadata.
 
 ### standard
 

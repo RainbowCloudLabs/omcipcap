@@ -9,6 +9,8 @@ import re
 import tempfile
 from pathlib import Path
 
+from scapy.all import wrpcap
+
 from omci import omcimd, omciparser, omcisemantic
 from omci.ai.rag.database import (
     COLLECTION_NAME,
@@ -286,8 +288,42 @@ def compose_md_sections(*sections: str) -> str:
     )
 
 
-def _analyze_pcap(pcap_path: Path, issue_text: str) -> dict[str, str]:
+def _write_omci_only_pcap(
+    packets: list[tuple[int, object, object | None]],
+    destination: Path,
+) -> None:
+    if not packets:
+        raise RAGIngestError("No recognized OMCI packets found in capture")
+
+    raw_packets: list[object] = []
+    for packet_no, _, raw_packet in packets:
+        if raw_packet is None:
+            raise RAGIngestError(
+                f"Cannot serialize OMCI packet {packet_no + 1}: raw packet unavailable"
+            )
+        try:
+            bytes(raw_packet)
+        except Exception as exc:
+            raise RAGIngestError(
+                f"Cannot serialize OMCI packet {packet_no + 1}: {exc}"
+            ) from exc
+        raw_packets.append(raw_packet)
+
+    try:
+        wrpcap(str(destination), raw_packets)
+    except Exception as exc:
+        raise RAGIngestError(
+            f"Cannot write OMCI-only PCAP '{destination}': {exc}"
+        ) from exc
+
+
+def _analyze_pcap(
+    pcap_path: Path,
+    issue_text: str,
+    stored_pcap: Path,
+) -> dict[str, str]:
     packets = load_omci_packets(str(pcap_path), include_raw=True)
+    _write_omci_only_pcap(packets, stored_pcap)
     check_data = omciparser.get_check_results(packets, only_failed=True)
     upload_data = omciparser.get_mib_db_data(packets, only_upload=True)
     full_data = omciparser.get_mib_db_data(packets)
@@ -380,23 +416,23 @@ def _stage_issue_markdown(stored_issue: Path, issue_text: str) -> Path:
         ) from exc
 
 
-def _restore_issue_markdown(stored_issue: Path, previous_issue: bytes | None) -> None:
-    if previous_issue is None:
-        if stored_issue.exists():
-            stored_issue.unlink()
+def _restore_stored_file(destination: Path, previous_data: bytes | None) -> None:
+    if previous_data is None:
+        if destination.exists():
+            destination.unlink()
         return
 
     temp_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
             "wb",
-            dir=stored_issue.parent,
-            prefix=f".{stored_issue.name}.restore.",
+            dir=destination.parent,
+            prefix=f".{destination.name}.restore.",
             delete=False,
         ) as f:
             temp_path = Path(f.name)
-            f.write(previous_issue)
-        temp_path.replace(stored_issue)
+            f.write(previous_data)
+        temp_path.replace(destination)
     finally:
         if temp_path is not None:
             try:
@@ -452,50 +488,90 @@ def ingest_case(
             f"Cannot inspect existing RAG case '{case_id}': {exc}"
         ) from exc
     previous_ids = previous.get("ids") or []
-    stored_issue = workspace / "issues" / f"{case_id}.md"
+    stored_issue = workspace / "cases" / f"{case_id}.md"
+    stored_pcap = workspace / "pcaps" / f"{case_id}.pcap"
 
-    if previous_ids or stored_issue.exists():
+    if previous_ids or stored_issue.exists() or stored_pcap.exists():
         print(f'Case "{case_id}" already exists.\n')
         answer = input("Replace existing case? [y/N] ")
         if answer.lower() != "y":
             print("Ingestion cancelled.")
             return False
 
-    semantic_units = _analyze_pcap(pcap_path, issue_text)
-    profile = str(config["profile_id"])
-    profile_config = PROFILE_CONFIGS[profile]
+    temp_pcap: Path | None = None
     try:
-        model = load_embedding_model(profile, local_files_only=True)
-    except WorkspaceInitError as exc:
-        raise RAGIngestError(
-            f"Embedding model for profile '{profile}' is not available locally.\n\n"
-            "Run:\n\n"
-            f"    omcipcap ai rag init --profile {profile} --dir {workspace}"
-        ) from exc
-    try:
+        with tempfile.NamedTemporaryFile(
+            "wb",
+            dir=stored_pcap.parent,
+            prefix=f".{stored_pcap.name}.",
+            delete=False,
+        ) as f:
+            temp_pcap = Path(f.name)
+        temp_pcap.unlink()
+
+        semantic_units = _analyze_pcap(pcap_path, issue_text, temp_pcap)
+        profile = str(config["profile_id"])
+        profile_config = PROFILE_CONFIGS[profile]
+        try:
+            model = load_embedding_model(profile, local_files_only=True)
+        except WorkspaceInitError as exc:
+            raise RAGIngestError(
+                f"Embedding model for profile '{profile}' is not available locally.\n\n"
+                "Run:\n\n"
+                f"    omcipcap ai rag init --profile {profile} --dir {workspace}"
+            ) from exc
+
         ids, documents, metadatas = build_chunk_records(
             case_id,
             semantic_units,
             model.tokenizer,
             int(profile_config["max_tokens"]),
             int(profile_config["token_overlap"]),
-            stored_issue.name,
-            pcap_path.name,
+            stored_issue.relative_to(workspace).as_posix(),
+            stored_pcap.relative_to(workspace).as_posix(),
             problem,
         )
         vectors = model.encode(documents)
         embeddings = [[float(value) for value in vector] for vector in vectors]
+    except RAGIngestError:
+        if temp_pcap is not None:
+            try:
+                temp_pcap.unlink()
+            except FileNotFoundError:
+                pass
+        raise
     except Exception as exc:
+        if temp_pcap is not None:
+            try:
+                temp_pcap.unlink()
+            except FileNotFoundError:
+                pass
         raise RAGIngestError(f"Failed to generate embeddings: {exc}") from exc
 
-    previous_issue = stored_issue.read_bytes() if stored_issue.exists() else None
-    temp_issue = _stage_issue_markdown(stored_issue, issue_text)
+    try:
+        previous_issue = stored_issue.read_bytes() if stored_issue.exists() else None
+        previous_pcap = stored_pcap.read_bytes() if stored_pcap.exists() else None
+        temp_issue = _stage_issue_markdown(stored_issue, issue_text)
+    except Exception as exc:
+        if temp_pcap is not None:
+            try:
+                temp_pcap.unlink()
+            except FileNotFoundError:
+                pass
+        if isinstance(exc, RAGIngestError):
+            raise
+        raise RAGIngestError(
+            f"Cannot stage stored artifacts for RAG case '{case_id}': {exc}"
+        ) from exc
 
-    # ChromaDB has no cross-resource transaction with the issue file. Keep complete
-    # backups and restore both resources if any destructive replacement step fails.
+    # ChromaDB has no cross-resource transaction with the stored files. Keep
+    # complete backups and restore every resource if replacement fails.
     try:
         collection.delete(where={"case_id": case_id})
         temp_issue.replace(stored_issue)
+        if temp_pcap is None:
+            raise RAGIngestError("OMCI-only PCAP was not staged")
+        temp_pcap.replace(stored_pcap)
         collection.upsert(
             ids=ids,
             documents=documents,
@@ -506,7 +582,8 @@ def ingest_case(
         try:
             collection.delete(where={"case_id": case_id})
             _restore_case(collection, previous)
-            _restore_issue_markdown(stored_issue, previous_issue)
+            _restore_stored_file(stored_issue, previous_issue)
+            _restore_stored_file(stored_pcap, previous_pcap)
         except Exception as restore_exc:
             raise RAGIngestError(
                 f"Failed to store RAG case '{case_id}' and restore its previous data: "
@@ -518,5 +595,10 @@ def ingest_case(
             temp_issue.unlink()
         except FileNotFoundError:
             pass
+        if temp_pcap is not None:
+            try:
+                temp_pcap.unlink()
+            except FileNotFoundError:
+                pass
 
     return True

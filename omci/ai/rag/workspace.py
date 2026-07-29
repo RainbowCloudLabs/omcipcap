@@ -33,7 +33,7 @@ PROFILE_CONFIGS: dict[str, dict[str, object]] = {
     },
 }
 SUPPORTED_PROFILES = tuple(PROFILE_CONFIGS)
-WORKSPACE_DIRS = ("db", "issues", "mib-json", "semantics")
+WORKSPACE_DIRS = ("db", "cases", "pcaps", "mib-json", "semantics")
 INIT_INSTRUCTION = "omcipcap ai rag init --profile <profile> --dir <workdir>"
 
 

@@ -168,7 +168,7 @@ The implementation MUST define the following named constants:
 
 ```python
 DEFAULT_TOP_K = 5
-MIN_SIMILARITY = 0.70
+MIN_SIMILARITY = 0.50
 ```
 
 If `--top-k` is omitted, the command MUST use `DEFAULT_TOP_K`.

@@ -23,7 +23,7 @@ from omci.ai.rag.workspace import (
 from omci.cli import main
 
 
-EXPECTED_DIRS = {"db", "issues", "mib-json", "semantics"}
+EXPECTED_DIRS = {"db", "cases", "pcaps", "mib-json", "semantics"}
 REAL_PREPARE_EMBEDDING_MODEL = rag_workspace.prepare_embedding_model
 
 
@@ -125,7 +125,7 @@ def test_rag_reinitialization_preserves_existing_data(
 ) -> None:
     configure_test_home(tmp_path, monkeypatch)
     workspace = initialize_workspace(tmp_path / "RAG", "standard")
-    issue = workspace / "issues" / "CASE-001.md"
+    issue = workspace / "cases" / "CASE-001.md"
     database_marker = workspace / "db" / "marker"
     issue.write_text("existing issue", encoding="utf-8")
     database_marker.write_text("existing database", encoding="utf-8")

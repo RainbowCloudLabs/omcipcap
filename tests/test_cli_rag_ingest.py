@@ -9,6 +9,7 @@ import builtins
 from pathlib import Path
 
 import pytest
+from scapy.all import Ether, IP, PcapNgWriter, UDP, rdpcap, wrpcap
 
 from omci.ai.rag import ingest as rag_ingest
 from omci.ai.rag.ingest import (
@@ -29,6 +30,8 @@ from omci.ai.rag.workspace import (
     WorkspaceInitError,
     initialize_workspace,
 )
+
+REAL_ANALYZE_PCAP = rag_ingest._analyze_pcap
 
 
 def issue_markdown(include_environment: bool = True) -> str:
@@ -79,11 +82,17 @@ def test_analyze_pcap_builds_complete_service_path(
     flow_data = object()
     topology_data = object()
     renderer_inputs: list[tuple[str, object]] = []
+    stored_captures: list[tuple[object, Path]] = []
 
     monkeypatch.setattr(
         rag_ingest,
         "load_omci_packets",
         lambda path, include_raw: packets,
+    )
+    monkeypatch.setattr(
+        rag_ingest,
+        "_write_omci_only_pcap",
+        lambda value, path: stored_captures.append((value, path)),
     )
     monkeypatch.setattr(
         rag_ingest.omciparser,
@@ -156,7 +165,9 @@ def test_analyze_pcap_builds_complete_service_path(
     monkeypatch.setattr(rag_ingest.omcimd, "render_tcont_flow_md", render_flow)
     monkeypatch.setattr(rag_ingest.omcimd, "render_topology_md", render_topology)
 
-    result = rag_ingest._analyze_pcap(Path("sample.pcap"), "ISSUE")
+    result = rag_ingest._analyze_pcap(
+        Path("sample.pcap"), "ISSUE", Path("stored.pcap")
+    )
 
     assert result == {
         "issue_summary": "ISSUE",
@@ -172,7 +183,65 @@ def test_analyze_pcap_builds_complete_service_path(
         ("flow", flow_data),
         ("topology", topology_data),
     ]
+    assert stored_captures == [(packets, Path("stored.pcap"))]
     assert result["service_path"] != "## T-CONT Flow"
+
+
+def write_capture(path: Path, packets: list[object]) -> None:
+    if path.suffix == ".pcapng":
+        writer = PcapNgWriter(str(path))
+        try:
+            for packet in packets:
+                writer.write(packet)
+        finally:
+            writer.close()
+        return
+    wrpcap(str(path), packets)
+
+
+@pytest.mark.parametrize("suffix", [".pcap", ".pcapng"])
+def test_analyze_pcap_stores_only_omci_packets_with_original_timestamps(
+    suffix: str,
+    tmp_path: Path,
+) -> None:
+    omci_packet = rdpcap("examples/omcicheck_example.pcap")[0]
+    omci_packet.time = 1_700_000_000.125
+    unrelated_packet = Ether() / IP() / UDP()
+    unrelated_packet.time = 1_700_000_000.250
+    source = tmp_path / f"source{suffix}"
+    destination = tmp_path / "stored.pcap"
+    write_capture(source, [unrelated_packet, omci_packet])
+
+    REAL_ANALYZE_PCAP(source, issue_markdown(), destination)
+
+    stored_packets = rdpcap(str(destination))
+    assert len(stored_packets) == 1
+    assert bytes(stored_packets[0]) == bytes(omci_packet)
+    assert float(stored_packets[0].time) == pytest.approx(float(omci_packet.time))
+    assert stored_packets[0][Ether].type == 0x88B5
+    assert destination.read_bytes()[:4] != b"\x0a\x0d\x0d\x0a"
+
+
+def test_write_omci_only_pcap_rejects_missing_raw_packet(tmp_path: Path) -> None:
+    with pytest.raises(RAGIngestError, match="raw packet unavailable"):
+        rag_ingest._write_omci_only_pcap(
+            [(0, object(), None)], tmp_path / "stored.pcap"
+        )
+
+
+def test_write_omci_only_pcap_reports_write_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail_write(path: str, packets: list[object]) -> None:
+        del path, packets
+        raise OSError("disk full")
+
+    monkeypatch.setattr(rag_ingest, "wrpcap", fail_write)
+
+    with pytest.raises(RAGIngestError, match="Cannot write OMCI-only PCAP.*disk full"):
+        rag_ingest._write_omci_only_pcap(
+            [(0, object(), b"packet")], tmp_path / "stored.pcap"
+        )
 
 
 class FakeCollection:
@@ -318,7 +387,9 @@ class CharacterTokenizer:
 
 
 def prepare_ingest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capture_suffix: str = ".pcap",
 ) -> tuple[Path, Path, Path, FakeCollection, FakeChroma]:
     home = tmp_path / "home"
     home.mkdir()
@@ -327,7 +398,7 @@ def prepare_ingest(
     initialize_workspace(workspace, "standard")
     issue_path = tmp_path / "issue.md"
     issue_path.write_text(issue_markdown(), encoding="utf-8")
-    pcap_path = tmp_path / "sample.pcap"
+    pcap_path = tmp_path / f"sample{capture_suffix}"
     pcap_path.write_bytes(b"pcap")
     collection = FakeCollection()
     chroma = FakeChroma(collection)
@@ -340,8 +411,9 @@ def prepare_ingest(
         assert local_files_only
         return FakeModel()
 
-    def analyze(path: Path, issue_text: str) -> dict[str, str]:
+    def analyze(path: Path, issue_text: str, stored_pcap: Path) -> dict[str, str]:
         assert path == pcap_path
+        stored_pcap.write_bytes(b"filtered pcap")
         return semantic_units(issue_text)
 
     def load_resources(path: Path) -> None:
@@ -356,16 +428,22 @@ def prepare_ingest(
     return workspace, issue_path, pcap_path, collection, chroma
 
 
-def test_successful_ingestion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("capture_suffix", [".pcap", ".pcapng"])
+def test_successful_ingestion(
+    capture_suffix: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     workspace, issue_path, pcap_path, collection, chroma = prepare_ingest(
-        tmp_path, monkeypatch
+        tmp_path, monkeypatch, capture_suffix
     )
 
     assert ingest_case("CASE-001", issue_path, pcap_path)
 
-    assert (workspace / "issues" / "CASE-001.md").read_text(
+    assert (workspace / "cases" / "CASE-001.md").read_text(
         encoding="utf-8"
     ) == issue_markdown()
+    assert (workspace / "pcaps" / "CASE-001.pcap").read_bytes() == b"filtered pcap"
     assert chroma.paths == [workspace / "db"]
     assert collection.metadata["hnsw:space"] == "cosine"
     assert list(collection.records) == [
@@ -382,8 +460,8 @@ def test_successful_ingestion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
             "semantic_unit": unit,
             "chunk_index": 0,
             "priority": priority,
-            "issue_file": "CASE-001.md",
-            "pcap_file": "sample.pcap",
+            "issue_file": "cases/CASE-001.md",
+            "pcap_file": "pcaps/CASE-001.pcap",
             "problem": "Service is unavailable.",
         }
 
@@ -415,7 +493,7 @@ def test_ingest_loads_shared_profile_model_from_local_cache_only(
             "sentence-transformers/all-MiniLM-L6-v2",
         )
     ]
-    assert (workspace / "issues" / "CASE-001.md").is_file()
+    assert (workspace / "cases" / "CASE-001.md").is_file()
 
 
 def test_ingest_local_model_failure_preserves_existing_case(
@@ -437,8 +515,10 @@ def test_ingest_local_model_failure_preserves_existing_case(
         "metadata": old_metadata,
         "embedding": [1.0],
     }
-    stored_issue = workspace / "issues" / "CASE-001.md"
+    stored_issue = workspace / "cases" / "CASE-001.md"
     stored_issue.write_text("old issue", encoding="utf-8")
+    stored_pcap = workspace / "pcaps" / "CASE-001.pcap"
+    stored_pcap.write_bytes(b"old filtered pcap")
 
     def confirm_replace(prompt: str) -> str:
         assert prompt == "Replace existing case? [y/N] "
@@ -462,6 +542,7 @@ def test_ingest_local_model_failure_preserves_existing_case(
         ingest_case("CASE-001", issue_path, pcap_path)
 
     assert stored_issue.read_text(encoding="utf-8") == "old issue"
+    assert stored_pcap.read_bytes() == b"old filtered pcap"
     assert collection.records == {
         old_id: {
             "document": "old document",
@@ -516,9 +597,10 @@ def test_workspace_resources_load_before_semantic_unit_analysis(
         del workspace
         events.append("resources")
 
-    def analyze(path: Path, issue_text: str) -> dict[str, str]:
+    def analyze(path: Path, issue_text: str, stored_pcap: Path) -> dict[str, str]:
         del path
         events.append("analysis")
+        stored_pcap.write_bytes(b"filtered pcap")
         return semantic_units(issue_text)
 
     monkeypatch.setattr(
@@ -539,7 +621,7 @@ def test_invalid_workspace_mib_json_preserves_existing_case(
     )
     invalid_json = workspace / "mib-json" / "invalid.json"
     invalid_json.write_text("{invalid", encoding="utf-8")
-    stored_issue = workspace / "issues" / "CASE-001.md"
+    stored_issue = workspace / "cases" / "CASE-001.md"
     stored_issue.write_text("old issue", encoding="utf-8")
     old_id = make_chunk_id("CASE-001", "issue_summary", 0)
     collection.records[old_id] = {
@@ -558,8 +640,10 @@ def test_invalid_workspace_mib_json_preserves_existing_case(
         assert Path(path) == invalid_json
         return False
 
-    def fail_if_analyzed(path: Path, issue_text: str) -> dict[str, str]:
-        del path, issue_text
+    def fail_if_analyzed(
+        path: Path, issue_text: str, stored_pcap: Path
+    ) -> dict[str, str]:
+        del path, issue_text, stored_pcap
         raise AssertionError("analysis must not start")
 
     monkeypatch.setattr("omci.cli.load_mib_json", reject_mib_json)
@@ -584,7 +668,7 @@ def test_semantic_plugin_error_preserves_existing_case(
     )
     plugin = workspace / "semantics" / "broken.py"
     plugin.write_text("raise RuntimeError('broken plugin')", encoding="utf-8")
-    stored_issue = workspace / "issues" / "CASE-001.md"
+    stored_issue = workspace / "cases" / "CASE-001.md"
     stored_issue.write_text("old issue", encoding="utf-8")
     old_id = make_chunk_id("CASE-001", "issue_summary", 0)
     collection.records[old_id] = {
@@ -732,7 +816,7 @@ def test_additional_section_is_preserved(
 
     assert ingest_case("CASE-001", issue_path, pcap_path)
 
-    stored = (workspace / "issues" / "CASE-001.md").read_text(encoding="utf-8")
+    stored = (workspace / "cases" / "CASE-001.md").read_text(encoding="utf-8")
     assert stored == issue_markdown()
     assert "## Notes\nPreserve this additional section." in stored
 
@@ -756,6 +840,8 @@ def test_duplicate_case_cancelled(
         },
         "embedding": [1.0],
     }
+    stored_pcap = workspace / "pcaps" / "CASE-001.pcap"
+    stored_pcap.write_bytes(b"old filtered pcap")
 
     def cancel_replace(prompt: str) -> str:
         assert prompt == "Replace existing case? [y/N] "
@@ -765,7 +851,8 @@ def test_duplicate_case_cancelled(
 
     assert not ingest_case("CASE-001", issue_path, pcap_path)
     assert collection.records[old_id]["document"] == "old"
-    assert not (workspace / "issues" / "CASE-001.md").exists()
+    assert not (workspace / "cases" / "CASE-001.md").exists()
+    assert stored_pcap.read_bytes() == b"old filtered pcap"
 
 
 def test_duplicate_case_replaced(
@@ -785,7 +872,9 @@ def test_duplicate_case_replaced(
         },
         "embedding": [1.0],
     }
-    (workspace / "issues" / "CASE-001.md").write_text("old", encoding="utf-8")
+    (workspace / "cases" / "CASE-001.md").write_text("old", encoding="utf-8")
+    stored_pcap = workspace / "pcaps" / "CASE-001.pcap"
+    stored_pcap.write_bytes(b"old filtered pcap")
 
     def confirm_replace(prompt: str) -> str:
         assert prompt == "Replace existing case? [y/N] "
@@ -796,7 +885,8 @@ def test_duplicate_case_replaced(
     assert ingest_case("CASE-001", issue_path, pcap_path)
     assert "old-stale-id" not in collection.records
     assert len(collection.records) == len(SEMANTIC_UNITS)
-    assert (workspace / "issues" / "CASE-001.md").read_text() == issue_markdown()
+    assert (workspace / "cases" / "CASE-001.md").read_text() == issue_markdown()
+    assert stored_pcap.read_bytes() == b"filtered pcap"
 
 
 def test_replacement_updates_problem_metadata(
@@ -841,8 +931,10 @@ def test_failed_replacement_restores_previous_case(
         "metadata": old_metadata,
         "embedding": [1.0],
     }
-    stored_issue = workspace / "issues" / "CASE-001.md"
+    stored_issue = workspace / "cases" / "CASE-001.md"
     stored_issue.write_text("old issue", encoding="utf-8")
+    stored_pcap = workspace / "pcaps" / "CASE-001.pcap"
+    stored_pcap.write_bytes(b"old filtered pcap")
 
     def confirm_replace(prompt: str) -> str:
         assert prompt == "Replace existing case? [y/N] "
@@ -862,6 +954,7 @@ def test_failed_replacement_restores_previous_case(
         }
     }
     assert stored_issue.read_text(encoding="utf-8") == "old issue"
+    assert stored_pcap.read_bytes() == b"old filtered pcap"
 
 
 def test_chunk_ids_are_deterministic() -> None:
@@ -1107,6 +1200,21 @@ def test_unsupported_capture_format_is_rejected(
 
     with pytest.raises(RAGIngestError, match="Unsupported capture format"):
         ingest_case("CASE-001", issue_path, unsupported)
+
+
+def test_ingest_rejects_capture_without_omci_packets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, issue_path, pcap_path, _, _ = prepare_ingest(tmp_path, monkeypatch)
+    unrelated_packet = Ether() / IP() / UDP()
+    wrpcap(str(pcap_path), [unrelated_packet])
+    monkeypatch.setattr(rag_ingest, "_analyze_pcap", REAL_ANALYZE_PCAP)
+
+    with pytest.raises(RAGIngestError, match="No recognized OMCI packets"):
+        ingest_case("CASE-001", issue_path, pcap_path)
+
+    assert not (workspace / "cases" / "CASE-001.md").exists()
+    assert not (workspace / "pcaps" / "CASE-001.pcap").exists()
 
 
 @pytest.mark.parametrize("case_id", ["", "   ", ".", "..", "../CASE", "a/b", r"a\b"])

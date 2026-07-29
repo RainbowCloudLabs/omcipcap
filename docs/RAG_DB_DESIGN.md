@@ -22,11 +22,24 @@ existing collection to another profile or embedding model.
 | `semantic_unit` | String | Semantic unit represented by the chunk |
 | `chunk_index` | Integer | Zero-based sequence within the semantic unit |
 | `priority` | Integer | Fixed retrieval priority of the semantic unit |
-| `issue_file` | String | Source issue Markdown filename |
-| `pcap_file` | String | Source PCAP filename |
+| `issue_file` | String | Workspace-relative path to the stored issue Markdown document |
+| `pcap_file` | String | Workspace-relative path to the stored source PCAP or PCAPNG file |
 | `problem` | String | Introductory description extracted from the issue Markdown `Problem` section |
 
 `chunk_index` is scoped to the combination of `case_id` and `semantic_unit`.
+
+The current schema associates one `pcap_file` with each issue case.
+
+`issue_file` and `pcap_file` MUST be workspace-relative paths. For example:
+
+```text
+issue_file = cases/case_01_olt_disply_confi_fail.md
+pcap_file = pcaps/case_01_olt_disply_confi_fail.pcap
+```
+
+These metadata values identify the stored artifacts associated with the case.
+They MUST NOT be absolute paths, and consumers MUST NOT assume that `case_id`
+alone determines either filename.
 
 The `problem` metadata stores the introductory description from the `Problem`
 section of the issue Markdown document.

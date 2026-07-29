@@ -143,7 +143,7 @@ def test_list_cases_uses_collection_metadata_only(
     workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    stored_issue = workspace / "issues" / "CASE-001.md"
+    stored_issue = workspace / "cases" / "CASE-001.md"
     stored_issue.write_text("not valid Markdown", encoding="utf-8")
     collection = FakeCollection([chunk("CASE-001", "Stored problem")])
     chroma = install_collection(workspace, monkeypatch, collection)
