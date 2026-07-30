@@ -35,6 +35,22 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 
 Optional feature: **AI/RAG**. See the [OMCIPcap AI/RAG User Guide](./docs/AI_README.md).
 
+## Analysis Model
+
+`omcipcap` is a vendor-neutral OMCI protocol analyzer.
+
+All analysis is derived **only from the observed OMCI protocol exchanges** in the captured PCAP. It does **not** emulate or reconstruct the actual runtime MIB state inside an ONU.
+
+For correct interpretation:
+
+- `mibdb` shows the MIB inferred from captured OMCI transactions.
+- Always review `mibdb` together with `check`, since missing packets, retransmissions, or protocol errors may affect the inferred state.
+
+## Current Limitations
+
+- Service switch-over analysis is not yet supported.
+- ONU delete / MIB reset reconstruction is not yet implemented.
+
 ## Project Structure
 
 ```text
