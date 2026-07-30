@@ -1,4 +1,4 @@
-# omcipcap
+# OMCIPcap
 
 [![PyPI Version](https://img.shields.io/pypi/v/omcipcap?color=blue)](https://pypi.org/project/omcipcap/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/omcipcap?label=downloads&color=green)](https://pypi.org/project/omcipcap/)
@@ -33,7 +33,7 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 | `topology (graphic)` | Generate interactive topology HTML | Interactive HTML / JSON / Markdown |
 | `overview-json` | Dump overview.json (combined JSON output from multiple subcommands)| JSON |
 
-
+Optional feature: **AI/RAG**. See the [OMCIPcap AI/RAG User Guide](./docs/AI_README.md).
 
 ## Project Structure
 
