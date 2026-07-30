@@ -33,7 +33,7 @@ def _load_chromadb() -> object:
         raise WorkspaceInitError(
             "AI dependencies are not installed.\n\n"
             "Install them with:\n\n"
-            '    pip install "omcipcap[ai]"'
+            '    pip install "omcipcap[rag]"'
         ) from exc
     return chromadb
 
@@ -79,9 +79,7 @@ def get_rag_status() -> RAGStatus:
             raise ValueError("collection metadata is missing")
         schema_version = metadata.get("db_schema_version")
         database_profile = metadata.get("profile_id")
-        if not isinstance(schema_version, int) or not isinstance(
-            database_profile, str
-        ):
+        if not isinstance(schema_version, int) or not isinstance(database_profile, str):
             raise ValueError("collection metadata is invalid")
         records = collection.get(include=["metadatas"])
         record_metadatas = records.get("metadatas") or []

@@ -49,7 +49,7 @@ def _load_ai_dependencies() -> tuple[object, object]:
         raise WorkspaceInitError(
             "AI dependencies are not installed.\n\n"
             "Install them with:\n\n"
-            '    pip install "omcipcap[ai]"'
+            '    pip install "omcipcap[rag]"'
         ) from exc
     return chromadb, SentenceTransformer
 
@@ -157,9 +157,7 @@ def _validate_workspace_metadata(
 ) -> dict[str, object]:
     config_path = workspace / "config.json"
     if not config_path.is_file():
-        raise WorkspaceInitError(
-            f"RAG workspace metadata is missing: '{config_path}'"
-        )
+        raise WorkspaceInitError(f"RAG workspace metadata is missing: '{config_path}'")
 
     config = _read_json(config_path)
     if config.get("db_schema_version") != DB_SCHEMA_VERSION:
@@ -169,9 +167,7 @@ def _validate_workspace_metadata(
 
     profile = config.get("profile_id")
     if not isinstance(profile, str) or profile not in SUPPORTED_PROFILES:
-        raise WorkspaceInitError(
-            f"RAG workspace profile is unsupported: '{profile}'"
-        )
+        raise WorkspaceInitError(f"RAG workspace profile is unsupported: '{profile}'")
     if requested_profile is not None and profile != requested_profile:
         raise WorkspaceInitError(
             f"RAG workspace profile '{profile}' conflicts with requested profile "
@@ -308,7 +304,6 @@ def resolve_workspace(
         )
     except WorkspaceInitError as exc:
         raise WorkspaceInitError(
-            f"Configured RAG workspace is invalid: {exc}. "
-            f"Run: {INIT_INSTRUCTION}"
+            f"Configured RAG workspace is invalid: {exc}. Run: {INIT_INSTRUCTION}"
         ) from exc
     return workspace, config

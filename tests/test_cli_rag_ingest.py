@@ -165,9 +165,7 @@ def test_analyze_pcap_builds_complete_service_path(
     monkeypatch.setattr(rag_ingest.omcimd, "render_tcont_flow_md", render_flow)
     monkeypatch.setattr(rag_ingest.omcimd, "render_topology_md", render_topology)
 
-    result = rag_ingest._analyze_pcap(
-        Path("sample.pcap"), "ISSUE", Path("stored.pcap")
-    )
+    result = rag_ingest._analyze_pcap(Path("sample.pcap"), "ISSUE", Path("stored.pcap"))
 
     assert result == {
         "issue_summary": "ISSUE",
@@ -754,7 +752,9 @@ def test_extract_problem_rejects_missing_section() -> None:
 
 def test_extract_problem_rejects_empty_section() -> None:
     with pytest.raises(RAGIngestError, match="Section is empty: Problem"):
-        extract_markdown_section("# Problem\n \n## Diagnostic Notes\nVendor\n", "Problem")
+        extract_markdown_section(
+            "# Problem\n \n## Diagnostic Notes\nVendor\n", "Problem"
+        )
 
 
 def test_missing_required_section() -> None:
@@ -1249,6 +1249,6 @@ def test_ai_dependency_unavailable_has_clear_error(
 
     with pytest.raises(
         RAGIngestError,
-        match=r"(?s)AI dependencies are not installed.*omcipcap\[ai\]",
+        match=r"(?s)AI dependencies are not installed.*omcipcap\[rag\]",
     ):
         rag_ingest._load_ai_dependencies()

@@ -89,7 +89,7 @@ def validate_issue_markdown(text: str) -> None:
     ]
     if missing:
         raise RAGIngestError(
-            "Issue Markdown is missing required level-2 section(s): "
+            "Issue Markdown is missing required level-1 section(s): "
             + ", ".join(missing)
         )
 

@@ -45,7 +45,7 @@ def _load_chromadb() -> object:
         raise RAGDatabaseError(
             "AI dependencies are not installed.\n\n"
             "Install them with:\n\n"
-            '    pip install "omcipcap[ai]"'
+            '    pip install "omcipcap[rag]"'
         ) from exc
     return chromadb
 
