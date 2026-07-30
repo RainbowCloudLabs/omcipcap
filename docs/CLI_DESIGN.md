@@ -5,7 +5,7 @@
 `omcipcap` is a command-line interface for inspecting OMCI traffic captured in
 PCAP files. Its current non-AI commands check protocol behavior, reconstruct and
 compare MIB state, derive VLAN and T-CONT/GEM relationships, render logical
-topology, and produce a combined JSON overview.
+topology, and produce a combined Markdown or JSON overview.
 
 This document describes the implemented CLI in `omci.cli` and the non-AI
 modules it calls. It does not describe the `omci/ai` package, `omcipcap ai`,
@@ -31,7 +31,7 @@ omcipcap
 │   └── alias: graphic
 ├── vlan-tbl
 ├── tcont-flow
-└── overview-json
+└── overview
 ```
 
 Running the program without a recognized command prints root help. Unknown
@@ -58,8 +58,8 @@ is not completely uniform:
   Rich output by default, JSON with `-j`, and Markdown with `--md`.
 - `topology`/`graphic` supports JSON and Markdown, but its default is an HTML
   file rather than Rich terminal output.
-- `overview-json` accepts the inherited flags but does not inspect them. It
-  always writes `overview.json`.
+- `overview` prints Markdown by default and JSON with `-j`. `--md` may be used
+  to select Markdown explicitly.
 
 No other argument is global. In particular, `--mib-json` and `--semantic-dir`
 are present only on selected subcommands.
@@ -144,8 +144,8 @@ Presentation modules are separated by target:
 | `omci.omcigrapher` | vis-network HTML for topology |
 
 `output_result()` is not universal. `topology` implements its own JSON,
-Markdown, and HTML branches. `overview-json` delegates to `omci.overview`,
-which writes a file directly.
+Markdown, and HTML branches. `overview` uses command-specific JSON and Markdown
+output control.
 
 ## Output modes
 
@@ -157,7 +157,7 @@ which writes a file directly.
 | `topology`, `graphic` | HTML file | Yes | Yes | Yes, default |
 | `vlan-tbl` | Rich table | Yes | Yes | No |
 | `tcont-flow` | Rich tree | Yes | Yes | No |
-| `overview-json` | `overview.json` | Flag accepted but ignored | Flag accepted but ignored | JSON file only |
+| `overview` | Markdown stdout | Yes | Yes, default | No |
 
 The five `output_result()` users currently emit JSON with two-space indentation.
 Topology uses four-space indentation. JSON object keys that originate as
@@ -168,9 +168,8 @@ HTML mode. Without it, the path is the PCAP path with its extension replaced by
 `.html`. JSON or Markdown returns before any HTML file is written. Generated
 HTML references vis-network from a CDN.
 
-`overview-json` always writes the fixed relative path `overview.json` in the
-current working directory and prints a success message; it does not stream the
-document to stdout.
+`overview` always writes its selected representation to stdout and does not
+create an output file automatically.
 
 ## External extension mechanisms
 
@@ -179,7 +178,7 @@ semantic directory.
 
 ### `--mib-json`
 
-Supported by `mibdb`, `mibdb-diff`/`diff`, and `overview-json`.
+Supported by `mibdb`, `mibdb-diff`/`diff`, and `overview`.
 
 The JSON file must contain a mapping from class ID to an ME specification.
 `load_mib_json()` converts each key with `int()` and replaces or adds the entry
@@ -311,20 +310,42 @@ hierarchy, including decoded bandwidth information.
 | `pcap` | Required capture path |
 | `-j`, `--json-output`; `--md` | Select JSON or Markdown instead of the Rich tree |
 
-### `overview-json`
+### `overview`
 
 Loads one capture and combines check results, MIB data, VLAN data, T-CONT flow
-data, topology data, and basic ONU capability counts into one JSON document.
+data, topology data, and basic ONU capability counts into one report.
 
 | Option | Behavior |
 | --- | --- |
 | `pcap` | Required capture path |
 | `--mib-json PATH` | Load ME definitions before analysis |
 | `--semantic-dir DIR` | Load attribute translators before analysis |
-| `-j`, `--json-output`; `--md` | Accepted by the parser but currently ignored |
+| `-j`, `--json-output` | Print JSON instead of the default Markdown |
+| `--md` | Select Markdown explicitly |
 
-The command always writes `overview.json` in the current directory. It does not
-use `output_result()`.
+Markdown is printed to stdout by default:
+
+```bash
+omcipcap overview sample.pcap
+omcipcap overview sample.pcap | glow -t
+omcipcap overview sample.pcap > overview.md
+```
+
+Markdown output is suitable for human reading, GitHub preview, RAG, LLM
+context, and issue attachments. The report begins with `# Overview`.
+
+JSON contains the same combined overview data and is suitable for programs,
+CI/CD pipelines, and automation:
+
+```bash
+omcipcap overview sample.pcap -j
+omcipcap overview sample.pcap -j > overview.json
+omcipcap overview sample.pcap -j | jq
+```
+
+Both formats are written to stdout. The command does not create
+`overview.md` or `overview.json` automatically. `-j` and `--md` are mutually
+exclusive.
 
 ## Validation and error handling
 
@@ -354,14 +375,12 @@ renderers, file writes, or analysis code propagate normally.
 
 These are descriptions of implemented behavior, not recommendations:
 
-- Shared format flags are attached to every subcommand, but `overview-json`
-  ignores them.
 - `output_result()` covers five commands, while topology and overview use
   command-specific output control.
 - Default output means Rich terminal rendering for most commands, HTML file
-  creation for topology, and JSON file creation for overview.
+  creation for topology, and Markdown stdout for overview.
 - JSON indentation is two spaces through `output_result()` and four spaces for
-  topology; overview writes compact JSON.
+  topology; overview also writes indented JSON.
 - `--tpid-dei` affects only Rich VLAN presentation.
 - PCAP existence checks and diff path checks use separate dispatch branches.
 - Some invalid inputs produce messages and a successful process exit; other
@@ -373,8 +392,8 @@ These are descriptions of implemented behavior, not recommendations:
   when `main()` or handlers are invoked repeatedly in one interpreter.
 - External semantic modules execute arbitrary Python during loading, append
   their directory to `sys.path`, and have no ordering or isolation layer.
-- The topology HTML generator owns file writing, while the overview module owns
-  its JSON file writing; there is no common file-output abstraction.
+- The topology HTML generator owns file writing, while overview writes its
+  selected output to stdout.
 
 ## Design principles
 

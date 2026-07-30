@@ -14,6 +14,8 @@ Rules:
 - Prefer deterministic, git-friendly markdown.
 """
 
+from collections.abc import Mapping
+
 
 def _s(value):
     if value is None:
@@ -35,6 +37,39 @@ def _format_float(value, digits=6):
         return f"{float(value):.{digits}f}"
     except (ValueError, TypeError):
         return _s(value)
+
+
+def render_bullet_section(title: str, data: Mapping[str, object]) -> str:
+    """
+    Render a markdown bullet section.
+
+    Example:
+
+    render_bullet_section("ONU Capability", {
+        "PON Type": "XG-PON (Symmetric 10G/10G)",
+        "PPTP Ports": 1,
+        "POTS Ports": 0,
+        "T-CONTs": 2,
+        "Priority Queues": 24,
+    })
+
+    =>
+    ## ONU Capability
+
+    - **PON Type:** XG-PON (Symmetric 10G/10G)
+    - **PPTP Ports:** 1
+    - **POTS Ports:** 0
+    - **T-CONTs:** 2
+    - **Priority Queues:** 24
+    """
+    if not data:
+        return render_section(title, "")
+
+    lines = []
+    for key, value in data.items():
+        lines.append(f"- **{_escape_md(key)}:** {_escape_md(value)}")
+
+    return render_section(title, "\n".join(lines))
 
 
 def render_markdown_table(headers, rows):
@@ -692,3 +727,26 @@ def render_topology_md(topo_data):
     )
 
     return "\n".join(parts).rstrip() + "\n"
+
+
+def render_overview_md(overview_data: Mapping[str, object]) -> str:
+    parts = []
+
+    capability = overview_data.get("onu_capability", {})
+    if isinstance(capability, Mapping) and capability:
+        capability_items = {
+            "PON Type": capability.get("pon_type", ""),
+            "PPTP Ports": capability.get("pptp_count", 0),
+            "POTS Ports": capability.get("pots_count", 0),
+            "T-CONTs": capability.get("tcont_count", 0),
+            "Priority Queues": capability.get("priority_queue_count", 0),
+        }
+        parts.append(render_bullet_section("ONU Capability", capability_items))
+
+    parts.append(render_check_md(overview_data["check_summary"]))
+    parts.append(render_mibdb_md(overview_data["mib_database"]))
+    parts.append(render_vlan_md(overview_data["vlan_operation_data"]))
+    parts.append(render_tcont_flow_md(overview_data["tcont_flows_data"]))
+    parts.append(render_topology_md(overview_data["topology_data"]))
+
+    return "# Overview\n" + "\n\n".join(parts) + "\n"

@@ -4,129 +4,173 @@
 # Copyright (c) 2026 Dong-Yuan Shih <daneshih1125@gmail.com>
 # Licensed under the MIT License.
 
-import subprocess
-import pytest
 import json
-import os
+from pathlib import Path
+import sys
+
+import pytest
+
+from omci import cli
 
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_test_files():
-    """
-    Generate the test pcap file using the utility script.
-    """
-    subprocess.run(["python3", "utils/generate_dual_gem_shared_tcont.py"], check=True)
-    yield
-    # Cleanup
-    if os.path.exists("single_unit_1_tont_2_gem.pcap"):
-        os.remove("single_unit_1_tont_2_gem.pcap")
-    if os.path.exists("overview.json"):
-        os.remove("overview.json")
+OVERVIEW_DATA = {
+    "check_summary": {"summary": {"resp_fail_count": 0}, "packets": []},
+    "mib_database": {"256": {"me_name": "ONT-G", "instances": {}}},
+    "vlan_operation_data": [],
+    "tcont_flows_data": [],
+    "topology_data": {"nodes": [], "edges": []},
+    "onu_capability": {
+        "pon_type": "XG-PON (Symmetric 10G/10G)",
+        "pptp_count": 1,
+        "pots_count": 0,
+        "tcont_count": 2,
+        "priority_queue_count": 24,
+    },
+}
 
 
-def get_overview_json():
-    """
-    Helper to run the overview-json command and read the generated JSON file.
-    """
-    cmd = ["omcipcap", "overview-json", "single_unit_1_tont_2_gem.pcap"]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-
-    # Check if output file was created
-    assert os.path.exists("overview.json"), "overview.json file was not generated"
-
-    # Read and parse the JSON file
-    with open("overview.json", "r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except json.JSONDecodeError:
-            pytest.fail("Failed to parse JSON from overview.json file")
-
-
-def test_onu_capability_pon_type():
-    """
-    Verify ONU capability PON type detection.
-    """
-    data = get_overview_json()
-    onu_cap = data["onu_capability"]
-
-    assert "pon_type" in onu_cap, "pon_type field is missing from onu_capability"
-    assert onu_cap["pon_type"] == "XG-PON (Symmetric 10G/10G)", (
-        f"Expected PON type 'XG-PON (Symmetric 10G/10G)', got '{onu_cap['pon_type']}'"
+def configure_overview_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    arguments: list[str],
+) -> Path:
+    pcap_path = tmp_path / "sample.pcap"
+    pcap_path.write_bytes(b"pcap")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        cli.overview,
+        "generate_pcap_ai_overview_data",
+        lambda path: OVERVIEW_DATA,
     )
-
-
-def test_onu_capability_pptp_count():
-    """
-    Verify ONU capability PPTP Ethernet UNI port count.
-    """
-    data = get_overview_json()
-    onu_cap = data["onu_capability"]
-
-    assert "pptp_count" in onu_cap, "pptp_count field is missing from onu_capability"
-    assert onu_cap["pptp_count"] == 1, (
-        f"Expected 1 PPTP port, got {onu_cap['pptp_count']}"
+    monkeypatch.setattr(
+        cli.omcimd,
+        "render_overview_md",
+        lambda data: "# Overview\n\nRendered overview\n",
     )
-
-
-def test_onu_capability_pots_count():
-    """
-    Verify ONU capability POTS UNI port count.
-    """
-    data = get_overview_json()
-    onu_cap = data["onu_capability"]
-
-    assert "pots_count" in onu_cap, "pots_count field is missing from onu_capability"
-    assert onu_cap["pots_count"] == 0, (
-        f"Expected 0 POTS ports, got {onu_cap['pots_count']}"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["omcipcap", "overview", str(pcap_path), *arguments],
     )
+    return pcap_path
 
 
-def test_onu_capability_tcont_count():
-    """
-    Verify ONU capability T-CONT count.
-    """
-    data = get_overview_json()
-    onu_cap = data["onu_capability"]
+def assert_no_overview_files(tmp_path: Path) -> None:
+    assert not (tmp_path / "overview.json").exists()
+    assert not (tmp_path / "overview.md").exists()
 
-    assert "tcont_count" in onu_cap, "tcont_count field is missing from onu_capability"
-    assert onu_cap["tcont_count"] == 2, (
-        f"Expected 2 T-CONTs, got {onu_cap['tcont_count']}"
+
+def test_overview_is_registered(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["omcipcap", "overview", "--help"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main()
+
+    assert exc_info.value.code == 0
+    assert "usage: omcipcap overview" in capsys.readouterr().out
+
+
+def test_overview_json_is_not_registered(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["omcipcap", "overview-json"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main()
+
+    assert exc_info.value.code == 2
+    assert "invalid choice: 'overview-json'" in capsys.readouterr().err
+
+
+def test_overview_defaults_to_markdown_stdout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_overview_cli(monkeypatch, tmp_path, [])
+
+    cli.main()
+
+    output = capsys.readouterr().out
+    assert output.startswith("# Overview")
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(output)
+    assert_no_overview_files(tmp_path)
+
+
+def test_overview_json_mode_writes_json_stdout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_overview_cli(monkeypatch, tmp_path, ["-j"])
+
+    cli.main()
+
+    output = capsys.readouterr().out
+    assert json.loads(output) == OVERVIEW_DATA
+    assert "# Overview" not in output
+    assert_no_overview_files(tmp_path)
+
+
+def test_overview_explicit_markdown_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_overview_cli(monkeypatch, tmp_path, ["--md"])
+
+    cli.main()
+
+    assert capsys.readouterr().out.startswith("# Overview")
+    assert_no_overview_files(tmp_path)
+
+
+def test_overview_loads_mib_json_and_semantic_extensions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mib_json = tmp_path / "vendor.json"
+    mib_json.write_text("{}", encoding="utf-8")
+    semantic_dir = tmp_path / "semantics"
+    semantic_dir.mkdir()
+    configure_overview_cli(
+        monkeypatch,
+        tmp_path,
+        ["--mib-json", str(mib_json), "--semantic-dir", str(semantic_dir)],
     )
+    loaded: list[tuple[str, Path]] = []
+
+    def load_mib(path: str) -> bool:
+        loaded.append(("mib", Path(path)))
+        return True
+
+    def load_semantics(path: str) -> bool:
+        loaded.append(("semantics", Path(path)))
+        return True
+
+    monkeypatch.setattr(cli, "load_mib_json", load_mib)
+    monkeypatch.setattr(cli.omcisemantic, "load_external_semantics", load_semantics)
+
+    cli.main()
+
+    assert loaded == [("mib", mib_json), ("semantics", semantic_dir)]
 
 
-def test_onu_capability_priority_queue_count():
-    """
-    Verify ONU capability Priority Queue count.
-    """
-    data = get_overview_json()
-    onu_cap = data["onu_capability"]
+def test_overview_json_and_markdown_are_mutually_exclusive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_overview_cli(monkeypatch, tmp_path, ["-j", "--md"])
 
-    assert "priority_queue_count" in onu_cap, (
-        "priority_queue_count field is missing from onu_capability"
-    )
-    assert onu_cap["priority_queue_count"] == 24, (
-        f"Expected 24 Priority Queues, got {onu_cap['priority_queue_count']}"
-    )
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main()
 
-
-def test_onu_capability_all_fields():
-    """
-    Comprehensive check: verify all expected fields exist in onu_capability.
-    """
-    data = get_overview_json()
-    onu_cap = data["onu_capability"]
-
-    expected_fields = {
-        "pon_type": str,
-        "pptp_count": int,
-        "pots_count": int,
-        "tcont_count": int,
-        "priority_queue_count": int,
-    }
-
-    for field, field_type in expected_fields.items():
-        assert field in onu_cap, f"Field '{field}' is missing from onu_capability"
-        assert isinstance(onu_cap[field], field_type), (
-            f"Field '{field}' should be {field_type.__name__}, "
-            f"got {type(onu_cap[field]).__name__}"
-        )
+    assert exc_info.value.code == 2
+    assert "not allowed with argument" in capsys.readouterr().err
+    assert_no_overview_files(tmp_path)

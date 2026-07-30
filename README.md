@@ -31,7 +31,7 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 | `vlan-tbl` | Analyze OMCI VLAN tagging logic (Table-driven) | Table / JSON / Markdown |
 | `tcont-flow` | Trace T-CONT → GEM → PQ traffic hierarchy | Table / JSON / Markdown |
 | `topology (graphic)` | Generate interactive topology HTML | Interactive HTML / JSON / Markdown |
-| `overview-json` | Dump overview.json (combined JSON output from multiple subcommands)| JSON |
+| `overview` | Combine ONU capability, checks, MIB, VLAN, flow, and topology analysis | Markdown / JSON |
 
 Optional feature: **AI/RAG**. See the [OMCIPcap AI/RAG User Guide](./docs/AI_README.md).
 
@@ -260,6 +260,31 @@ Each T-CONT entry shows:
 - **GEM ports**: All GEM Port Network CTPs bound to this T-CONT.
 - **[US] PQ**: Upstream Priority Queue with CIR/PIR bandwidth limits.
 - **[DS] PQ**: Downstream Priority Queue with scheduling priority.
+
+### omcipcap overview
+
+Generate a combined overview report. Markdown is printed to stdout by default:
+
+```bash
+omcipcap overview sample.pcap
+omcipcap overview sample.pcap | glow -t
+omcipcap overview sample.pcap > overview.md
+```
+
+Markdown output is suitable for human reading, GitHub preview, RAG, LLM
+context, and issue attachments.
+
+Use `-j` for JSON output:
+
+```bash
+omcipcap overview sample.pcap -j
+omcipcap overview sample.pcap -j > overview.json
+omcipcap overview sample.pcap -j | jq
+```
+
+JSON output is suitable for programs, CI/CD pipelines, and automation.
+`overview` always writes to stdout and does not create an output file
+automatically. See the [CLI design guide](./docs/CLI_DESIGN.md) for details.
 
 ## Disclaimer
 this software is for educational and network debugging purposes only. The author (daneshih1125) provides this software "as is" without warranty of any kind. 

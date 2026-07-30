@@ -230,11 +230,19 @@ def run_tcont_flow(pcap_path, json_output=False, md_output=False):
     )
 
 
-def run_overview_json(pcap):
+def run_overview(
+    pcap_path: str,
+    json_output: bool = False,
+    md_output: bool = True,
+) -> None:
     """
-    Output overview.json
+    Output overview
     """
-    overview.generate_pcap_ai_overview_json(pcap)
+    overview_data = overview.generate_pcap_ai_overview_data(pcap_path)
+    if json_output:
+        print(json.dumps(overview_data))
+        return
+    print(omcimd.render_overview_md(overview_data))
 
 
 def load_mib_json(json_path):
@@ -412,11 +420,11 @@ def main() -> None:
     )
     tcont_p.add_argument("pcap", help="Path to pcap file")
 
-    # --- Sub-command: overview-json ---
+    # --- Sub-command: overview ---
     overview_p = subparsers.add_parser(
-        "overview-json",
+        "overview",
         parents=[common_args],
-        help="Dump overview.json (Combines all sub-command JSON outputs)",
+        help="Display ONU capability and combines all sub-command outputs",
     )
     overview_p.add_argument("pcap", help="Path to pcap file")
     overview_p.add_argument("--mib-json", help="Custom ME JSON definition")
@@ -433,7 +441,7 @@ def main() -> None:
         "tcont-flow",
         "topology",
         "graphic",
-        "overview-json",
+        "overview",
     ]
     if args.command in commands_need_pcap:
         if not hasattr(args, "pcap") or not args.pcap or not os.path.exists(args.pcap):
@@ -576,10 +584,10 @@ def main() -> None:
             json_output=args.json_output,
             md_output=args.md,
         )
-    elif args.command == "overview-json":
+    elif args.command == "overview":
         if not args_load_json_semantic(args):
             return
-        run_overview_json(args.pcap)
+        run_overview(args.pcap, json_output=args.json_output, md_output=args.md)
     else:
         parser.print_help()
 
