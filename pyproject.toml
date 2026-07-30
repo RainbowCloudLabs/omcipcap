@@ -24,9 +24,9 @@ rag = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/daneshih1125/omcipcap"
-"Repository" = "https://github.com/daneshih1125/omcipcap"
-"Bug Tracker" = "https://github.com/daneshih1125/omcipcap/issues"
+"Homepage" = "https://github.com/RainbowCloudLabs/omcipcap"
+"Repository" = "https://github.com/RainbowCloudLabs/omcipcap"
+"Bug Tracker" = "https://github.com/RainbowCloudLabs/omcipcap/issues"
 
 [project.scripts]
 omcipcap = "omci.cli:main"
