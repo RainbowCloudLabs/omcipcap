@@ -77,7 +77,7 @@ Get ready-to-run executables for your platform:
 
 - **Windows (64-bit)**: [omcipcap.exe](https://github.com/RainbowCloudLabs/omcipcap/releases/latest/download/omcipcap.exe)
 - **Linux (64-bit)**: [omcipcap_linux](https://github.com/RainbowCloudLabs/omcipcap/releases/latest/download/omcipcap_linux)
-- **macOS (ARM64)**: [omcipcap_mac](https://github.com/daneshih1125/RainbowCloudLabs/releases/latest/download/omcipcap_mac)
+- **macOS (ARM64)**: [omcipcap_mac](https://github.com/RainbowCloudLabs/releases/latest/download/omcipcap_mac)
 
 No Python installation required!
 
