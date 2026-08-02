@@ -1,6 +1,6 @@
 # AI Provider Framework Specification
 
-**Status:** Draft (Design Review)
+**Status:** Draft (Phase 1)
 
 ---
 
@@ -8,6 +8,12 @@
 
 The AI Provider Framework provides a reusable abstraction for communicating
 with Large Language Model (LLM) providers.
+
+The AI Provider Framework is responsible only for communicating with
+AI providers.
+
+It is NOT responsible for prompt construction, diagnosis workflow, RAG,
+or domain-specific logic.
 
 Provider adapters must be reusable by all AI commands.
 
@@ -54,7 +60,7 @@ layer.
 Suggested layout:
 
 ```
-ai/providers/
+omci/ai/providers/
   __init__.py
   base.py
   factory.py
@@ -81,13 +87,78 @@ Each provider adapter is responsible for:
 `base.py` MUST define the common provider interface used by all provider
 adapters.
 
-The interface MUST provide:
-
-- list available models
-- send generation requests
-- stream generated responses
+The common provider interface is defined in "Required Provider Operations".
 
 ---
+
+## Required Provider Operations
+
+Every provider adapter MUST expose the following two operations through the
+common provider interface.
+
+### List Models
+
+```python
+def list_models(self) -> list[str]:
+    ...
+```
+
+`list_models()` retrieves the model identifiers available from the provider.
+
+The returned value MUST:
+
+- contain model identifiers only
+- contain no empty identifiers
+- contain no duplicate identifiers
+- use deterministic ordering
+- hide provider-specific response structures from consumers
+
+When remote model discovery is supported, the adapter MUST use the provider's
+official model-listing REST API.
+
+When remote model discovery is unavailable, the adapter MAY return a documented
+built-in model list.
+
+The adapter MUST NOT invent model identifiers.
+
+### Stream Generation
+
+```python
+from collections.abc import Iterator
+
+def stream_generate(
+    self,
+    *,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+) -> Iterator[str]:
+    ...
+```
+
+`stream_generate()` sends one generation request and yields generated text as it
+is received.
+
+Inputs:
+
+- `model`: provider-specific model identifier
+- `system_prompt`: instructions describing the model's role and behavior
+- `user_prompt`: user content and generated analysis context
+
+The returned iterator MUST yield plain text chunks only.
+
+It MUST NOT yield:
+
+- raw SSE lines
+- raw JSON objects
+- provider event names
+- completion markers
+- usage metadata
+- provider-specific response objects
+
+The adapter MUST stop iteration when the provider reports normal completion.
+
+Provider-specific streaming formats MUST remain internal to the adapter.
 
 ## Provider Factory
 
@@ -98,11 +169,21 @@ Consumers MUST create providers through the factory.
 
 Consumers MUST NOT import provider implementations directly.
 
+`factory.py` MUST expose:
+
+```python
+def create_provider(name: str) -> AIProvider:
+    ...
+```
+
+Unknown provider names MUST raise AIProviderConfigError.
+
 ---
 
 ## Authentication
 
 Provider adapters MUST obtain credentials from environment variables.
+The environment variable names are provider-specific.
 
 API keys MUST NOT be accepted through command-line arguments.
 
@@ -126,31 +207,14 @@ Consumers MUST treat every provider identically.
 
 ## Streaming
 
-The first implementation MUST support streaming responses.
+Provider adapters MUST:
 
-Provider adapters MUST follow each provider's official streaming REST API and
-implement it using `requests` with `stream=True`.
-
-Official provider SDKs MUST NOT be used.
-
-Provider-specific streaming events MUST be normalized into plain text chunks
-before being returned to the consumer.
-
-Consumers MUST:
-
-- write generated text incrementally to stdout
-- flush stdout after every chunk
-- preserve Markdown formatting
-- write warnings, progress, and errors to stderr
-- remain compatible with shell redirection
-- print a final newline after successful completion
-- return a non-zero exit status if the stream fails
-
-If a stream fails after partial output has already been written:
-
-- keep the partial response on stdout
-- report the failure on stderr
-- return a non-zero exit status
+- use the official streaming REST API
+- use `requests` with `stream=True`
+- normalize provider events into plain text chunks
+- stop on normal completion
+- close the HTTP response on success or failure
+- raise shared provider exceptions on stream failure
 
 ---
 
@@ -162,6 +226,13 @@ Provider adapters MUST convert provider-specific HTTP and parsing errors into
 shared provider exceptions.
 
 Consumers MUST NOT depend on provider-specific exceptions.
+
+`errors.py` MUST define at least:
+
+- `AIProviderError`
+- `AIProviderConfigError`
+- `AIProviderRequestError`
+- `AIProviderResponseError`
 
 ---
 
@@ -186,4 +257,3 @@ Implementation requirements:
 - Implement HTTP requests using the Python `requests` package only.
 - Do NOT use official Python SDKs (for example `openai`, `anthropic`, `google-genai`).
 - Keep the implementation lightweight with minimal dependencies.
-- Reuse a single `requests.Session` when appropriate.
