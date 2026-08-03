@@ -1,6 +1,7 @@
 # AI Provider Framework Specification
 
-**Status:** Implemented (Phase 1)
+**Status:** Implemented
+**Version:** 2
 
 ---
 
@@ -183,12 +184,22 @@ Unknown provider names MUST raise AIProviderConfigError.
 ## Authentication
 
 Provider adapters MUST obtain credentials from environment variables.
+
 The environment variable names are provider-specific.
 
 API keys MUST NOT be accepted through command-line arguments.
 
-Provider adapters MUST validate required credentials before making any HTTP
-request.
+Provider adapters MUST validate required credentials before making any HTTP request.
+
+For Ollama, the adapter MAY read `OLLAMA_BASE_URL` from the environment.
+
+If `OLLAMA_BASE_URL` is not specified, the default base URL MUST be:
+
+```text
+```
+http://localhost:11434
+```
+```
 
 ---
 
