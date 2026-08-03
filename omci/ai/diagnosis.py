@@ -150,8 +150,11 @@ def load_system_prompt() -> str:
 
 
 def load_problem_prompt(path: Path) -> str:
-    """Load a user-authored diagnosis problem without altering its content."""
-    return _read_markdown(path, "Problem Markdown")
+    """Load a non-empty user-authored diagnosis problem."""
+    prompt = _read_markdown(path, "Problem Markdown")
+    if not prompt.strip():
+        raise AIDiagnosisError(f"Problem Markdown file is empty: {path}")
+    return prompt
 
 
 def generate_overview_markdown(pcap_path: Path) -> str:
@@ -199,5 +202,7 @@ def run_diagnosis(
         ):
             stream.write(fragment)
             stream.flush()
+        stream.write("\n")
+        stream.flush()
     except KeyboardInterrupt as exc:
         raise AIDiagnosisError("AI diagnosis streaming interrupted.") from exc

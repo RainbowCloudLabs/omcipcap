@@ -86,7 +86,9 @@ def test_prompt_file_errors_are_clear(
 ) -> None:
     missing_path = tmp_path / "missing.md"
     monkeypatch.setenv("AI_DIAG_SYSTEM_PROMPT", str(missing_path))
-    with pytest.raises(diagnosis.AIDiagnosisError, match="System prompt file not found"):
+    with pytest.raises(
+        diagnosis.AIDiagnosisError, match="System prompt file not found"
+    ):
         diagnosis.load_system_prompt()
 
     invalid_path = tmp_path / "invalid.md"
@@ -128,13 +130,26 @@ def test_generate_overview_markdown_reuses_existing_implementation(
     monkeypatch.setattr(
         diagnosis.omcimd,
         "render_overview_md",
-        lambda data: "# Overview\n\nObserved evidence\n" if data is overview_data else "",
+        lambda data: (
+            "# Overview\n\nObserved evidence\n" if data is overview_data else ""
+        ),
     )
 
     result = diagnosis.generate_overview_markdown(pcap_path)
 
     assert generated_paths == [str(pcap_path)]
     assert result == "# Overview\n\nObserved evidence\n"
+
+
+def test_load_problem_prompt_rejects_empty_file(tmp_path: Path) -> None:
+    problem_path = tmp_path / "problem.md"
+    problem_path.write_text("", encoding="utf-8")
+
+    with pytest.raises(
+        diagnosis.AIDiagnosisError,
+        match="Problem Markdown file is empty",
+    ):
+        diagnosis.load_problem_prompt(problem_path)
 
 
 def test_run_diagnosis_streams_provider_response(
@@ -172,8 +187,8 @@ def test_run_diagnosis_streams_provider_response(
             ),
         }
     ]
-    assert output.getvalue() == "First fragment"
-    assert output.flush_count == 2
+    assert output.getvalue() == "First fragment\n"
+    assert output.flush_count == 3
 
 
 def test_run_diagnosis_reports_streaming_interruption(
@@ -196,7 +211,9 @@ def test_run_diagnosis_reports_streaming_interruption(
     pcap_path.write_bytes(b"pcap")
     problem_path = tmp_path / "problem.md"
     problem_path.write_text("Problem", encoding="utf-8")
-    monkeypatch.setattr(diagnosis, "generate_overview_markdown", lambda path: "Overview")
+    monkeypatch.setattr(
+        diagnosis, "generate_overview_markdown", lambda path: "Overview"
+    )
     monkeypatch.setattr(
         diagnosis, "create_provider", lambda name: InterruptedProvider([])
     )
@@ -399,7 +416,7 @@ def test_ai_diag_uses_overview_generated_after_semantic_loading(
         "Problem",
         "# Overview\n\nCustom semantic evidence\n",
     )
-    assert capsys.readouterr().out == "Diagnosis"
+    assert capsys.readouterr().out == "Diagnosis\n"
 
 
 def test_ai_diag_semantic_loading_failure_prevents_provider_invocation(
