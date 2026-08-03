@@ -8,8 +8,9 @@ compare MIB state, derive VLAN and T-CONT/GEM relationships, render logical
 topology, and produce a combined Markdown or JSON overview.
 
 This document describes the implemented CLI in `omci.cli` and the non-AI
-modules it calls. It does not describe the `omci/ai` package, `omcipcap ai`,
-RAG commands, or planned behavior.
+modules it calls. It also records the root registration of implemented AI
+provider commands. Provider internals are defined in `docs/AI_PROVIDER.md`;
+diagnosis and RAG behavior are outside this document.
 
 The installed executable is declared in `pyproject.toml`:
 
@@ -23,6 +24,10 @@ omcipcap = omci.cli:main
 
 ```text
 omcipcap
+├── ai
+│   ├── providers
+│   ├── models
+│   └── rag (when optional RAG dependencies are installed)
 ├── check
 ├── mibdb
 ├── mibdb-diff
@@ -36,6 +41,9 @@ omcipcap
 
 Running the program without a recognized command prints root help. Unknown
 commands and invalid argument types are rejected by `argparse`.
+
+The `ai` parser is always registered for provider commands. Its `rag` child is
+registered only when the optional RAG dependencies are available.
 
 Aliases are parser aliases, not separate implementations. `argparse` preserves
 the spelling used by the caller in `args.command`, so dispatch explicitly
@@ -211,6 +219,17 @@ An invalid directory is reported and aborts command execution. Exceptions
 raised while importing an extension module are not caught by this loader.
 
 ## Command behavior
+
+### `ai providers` / `ai models`
+
+`ai providers` prints the supported provider names in deterministic order. It
+does not require credentials or perform a network request.
+
+`ai models --provider PROVIDER` creates an adapter through the provider factory
+and prints the model identifiers returned by `list_models()`. Provider
+configuration, authentication, HTTP communication, response normalization, and
+shared exceptions remain inside `omci.ai.providers`. Normal provider failures
+are reported as `argparse` errors without a traceback.
 
 ### `check`
 

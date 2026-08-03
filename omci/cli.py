@@ -17,6 +17,11 @@ from omci import omcisemantic
 from omci import omcirich
 from omci import omcimd
 from omci import overview
+from omci.ai.providers import (
+    AIProviderError,
+    SUPPORTED_PROVIDERS,
+    create_provider,
+)
 from omci.omci import load_omci_packets
 
 try:
@@ -293,10 +298,22 @@ def main() -> None:
         dest="command", help="Available analysis commands"
     )
 
+    # --- Sub-command: ai ---
+    ai_help = (
+        "AI-assisted analysis commands" if rag_available else "AI provider commands"
+    )
+    ai_p = subparsers.add_parser("ai", help=ai_help)
+    ai_subparsers = ai_p.add_subparsers(dest="ai_command")
+    ai_subparsers.add_parser("providers", help="List supported AI providers")
+    ai_models_p = ai_subparsers.add_parser(
+        "models", help="List available models for an AI provider"
+    )
+    ai_models_p.add_argument(
+        "--provider", required=True, help="AI provider name"
+    )
+
     if rag_available:
-        # --- Sub-command: ai rag init ---
-        ai_p = subparsers.add_parser("ai", help="AI-assisted analysis commands")
-        ai_subparsers = ai_p.add_subparsers(dest="ai_command")
+        # --- Sub-command: ai rag ---
         rag_p = ai_subparsers.add_parser("rag", help="RAG workspace commands")
         rag_subparsers = rag_p.add_subparsers(dest="rag_command")
         rag_init_p = rag_subparsers.add_parser(
@@ -448,7 +465,18 @@ def main() -> None:
             print(f"[!] Error: PCAP file not found: {getattr(args, 'pcap', 'N/A')}")
             return
 
-    if args.command == "ai" and args.ai_command == "rag" and args.rag_command == "init":
+    if args.command == "ai" and args.ai_command == "providers":
+        for provider_name in SUPPORTED_PROVIDERS:
+            print(provider_name)
+    elif args.command == "ai" and args.ai_command == "models":
+        try:
+            provider = create_provider(args.provider)
+            models = provider.list_models()
+        except AIProviderError as exc:
+            parser.error(str(exc))
+        for model in models:
+            print(model)
+    elif args.command == "ai" and args.ai_command == "rag" and args.rag_command == "init":
         try:
             workspace = initialize_workspace(Path(args.workdir), args.profile)
         except WorkspaceInitError as exc:

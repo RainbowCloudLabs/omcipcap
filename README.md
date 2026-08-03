@@ -32,6 +32,8 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 | `tcont-flow` | Trace T-CONT → GEM → PQ traffic hierarchy | Table / JSON / Markdown |
 | `topology (graphic)` | Generate interactive topology HTML | Interactive HTML / JSON / Markdown |
 | `overview` | Combine ONU capability, checks, MIB, VLAN, flow, and topology analysis | Markdown / JSON |
+| `ai providers` | List supported AI provider adapters | Text |
+| `ai models` | List models available from an AI provider | Text |
 
 Optional feature: **AI/RAG**. See the [OMCIPcap AI/RAG User Guide](./docs/AI_README.md).
 
@@ -93,6 +95,26 @@ chmod +x omcipcap_linux
 ```
 
 ## Sub-Command
+### omcipcap ai providers / models
+
+List the supported provider adapters without credentials or a network request:
+
+```bash
+omcipcap ai providers
+```
+
+List the models reported by one provider. Cloud providers read their API keys
+from the environment; API keys are not accepted as command-line arguments.
+
+```bash
+export OPENAI_API_KEY="your-api-key"
+omcipcap ai models --provider openai
+```
+
+Supported providers are `openai`, `claude`, `gemini`, `openrouter`, and
+`ollama`. Ollama uses the local service at `http://localhost:11434` and does
+not require an API key by default.
+
 ### omcipcap check
 Analyze a pcap file to display a summary of all OMCI packets:
 ```
