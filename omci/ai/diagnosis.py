@@ -165,6 +165,8 @@ def generate_overview_markdown(pcap_path: Path) -> str:
 
 def compose_user_prompt(problem_prompt: str, overview_markdown: str) -> str:
     """Combine the user problem and generated overview into the provider prompt."""
+    # Use Setext headings so user-authored Markdown may freely use ATX (`#`)
+    # headings without conflicting with the outer prompt sections.
     return (
         "User-Reported Problem\n"
         "=====================\n\n"
