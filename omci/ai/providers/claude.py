@@ -39,7 +39,9 @@ class ClaudeProvider(AIProvider):
                 payload = self._response_json(response)
             finally:
                 response.close()
-            if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("data"), list
+            ):
                 raise AIProviderResponseError("Claude returned an invalid model list.")
             identifiers.extend(
                 item.get("id") for item in payload["data"] if isinstance(item, dict)
@@ -48,7 +50,9 @@ class ClaudeProvider(AIProvider):
                 break
             last_id = payload.get("last_id")
             if not isinstance(last_id, str) or not last_id:
-                raise AIProviderResponseError("Claude returned invalid pagination data.")
+                raise AIProviderResponseError(
+                    "Claude returned invalid pagination data."
+                )
             params = {"after_id": last_id}
         return self._normalize_models(identifiers)
 
@@ -73,7 +77,7 @@ class ClaudeProvider(AIProvider):
             stream=True,
         )
         try:
-            for raw_line in response.iter_lines(decode_unicode=True):
+            for raw_line in response.iter_lines():
                 line = self._line_text(raw_line).strip()
                 if not line or line.startswith(":") or not line.startswith("data:"):
                     continue

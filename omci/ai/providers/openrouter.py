@@ -61,7 +61,7 @@ class OpenRouterProvider(AIProvider):
             stream=True,
         )
         try:
-            for raw_line in response.iter_lines(decode_unicode=True):
+            for raw_line in response.iter_lines():
                 line = self._line_text(raw_line).strip()
                 if not line or line.startswith(":") or not line.startswith("data:"):
                     continue
@@ -74,9 +74,7 @@ class OpenRouterProvider(AIProvider):
                         "OpenRouter returned an invalid streaming event."
                     )
                 if "error" in event:
-                    raise AIProviderRequestError(
-                        "OpenRouter stream reported an error."
-                    )
+                    raise AIProviderRequestError("OpenRouter stream reported an error.")
                 choices = event.get("choices")
                 if not isinstance(choices, list):
                     raise AIProviderResponseError(
@@ -91,9 +89,7 @@ class OpenRouterProvider(AIProvider):
                     content = delta.get("content")
                     if isinstance(content, str) and content:
                         yield content
-            raise AIProviderResponseError(
-                "OpenRouter stream ended before completion."
-            )
+            raise AIProviderResponseError("OpenRouter stream ended before completion.")
         except requests.RequestException as exc:
             raise self._stream_failure(exc) from exc
         finally:

@@ -27,6 +27,7 @@ omcipcap
 ├── ai
 │   ├── providers
 │   ├── models
+│   ├── diag
 │   └── rag (when optional RAG dependencies are installed)
 ├── check
 ├── mibdb
@@ -42,8 +43,8 @@ omcipcap
 Running the program without a recognized command prints root help. Unknown
 commands and invalid argument types are rejected by `argparse`.
 
-The `ai` parser is always registered for provider commands. Its `rag` child is
-registered only when the optional RAG dependencies are available.
+The `ai` parser is always registered for provider and diagnosis commands. Its
+`rag` child is registered only when the optional RAG dependencies are available.
 
 Aliases are parser aliases, not separate implementations. `argparse` preserves
 the spelling used by the caller in `args.command`, so dispatch explicitly
@@ -230,6 +231,20 @@ and prints the model identifiers returned by `list_models()`. Provider
 configuration, authentication, HTTP communication, response normalization, and
 shared exceptions remain inside `omci.ai.providers`. Normal provider failures
 are reported as `argparse` errors without a traceback.
+
+### `ai diag`
+
+`ai diag PCAP --problem-md FILE --provider PROVIDER --model MODEL` generates the
+standard overview Markdown for one capture and combines it with the unchanged
+UTF-8 problem document. The diagnosis layer loads the built-in system prompt or
+the complete replacement named by `AI_DIAG_SYSTEM_PROMPT`, creates the provider
+through the shared factory, and writes each generated fragment to stdout with
+an immediate flush. Input, provider, and streaming failures are reported as
+`argparse` errors on stderr with a nonzero exit status.
+
+`--mib-json PATH` and `--semantic-dir DIR` use the same command-specific loading
+path as `overview`. MIB definitions are loaded first, followed by semantic
+extensions, before overview generation or provider creation.
 
 ### `check`
 

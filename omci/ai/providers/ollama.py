@@ -57,7 +57,7 @@ class OllamaProvider(AIProvider):
             stream=True,
         )
         try:
-            for raw_line in response.iter_lines(decode_unicode=True):
+            for raw_line in response.iter_lines():
                 line = self._line_text(raw_line).strip()
                 if not line:
                     continue

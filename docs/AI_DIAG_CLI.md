@@ -105,7 +105,9 @@ omcipcap ai diag \
     omci.pcap \
     --problem-md problem.md \
     --provider openrouter \
-    --model anthropic/claude-opus-4.5
+    --model anthropic/claude-opus-4.5 \
+    --mib-json custom-me.json \
+    --semantic-dir semantic/
 ```
 
 Purpose:
@@ -118,6 +120,12 @@ Input:
 - user problem description
 - AI provider
 - model
+- optional custom Managed Entity definitions (`--mib-json`)
+- optional semantic extensions (`--semantic-dir`)
+
+Custom Managed Entity definitions are loaded before semantic extensions, using
+the same validation, loading, and error behavior as `omcipcap overview`. Both
+are applied before overview Markdown is generated.
 
 Generated context:
 
@@ -226,3 +234,10 @@ The first implementation does NOT include:
 - AI-assisted command execution
 
 These items may be implemented in future releases.
+
+## References
+
+This specification depends on:
+
+- `AI_PROVIDER.md`
+- `AI_DIAG_SYSTEM_PROMPT.md`

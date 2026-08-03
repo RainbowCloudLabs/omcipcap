@@ -17,6 +17,7 @@ from omci import omcisemantic
 from omci import omcirich
 from omci import omcimd
 from omci import overview
+from omci.ai import diagnosis
 from omci.ai.providers import (
     AIProviderError,
     SUPPORTED_PROVIDERS,
@@ -300,7 +301,9 @@ def main() -> None:
 
     # --- Sub-command: ai ---
     ai_help = (
-        "AI-assisted analysis commands" if rag_available else "AI provider commands"
+        "AI-assisted analysis commands"
+        if rag_available
+        else "AI provider and diagnosis commands"
     )
     ai_p = subparsers.add_parser("ai", help=ai_help)
     ai_subparsers = ai_p.add_subparsers(dest="ai_command")
@@ -310,6 +313,19 @@ def main() -> None:
     )
     ai_models_p.add_argument(
         "--provider", required=True, help="AI provider name"
+    )
+    ai_diag_p = ai_subparsers.add_parser(
+        "diag", help="Diagnose one OMCI capture with an AI provider"
+    )
+    ai_diag_p.add_argument("pcap", help="Path to pcap file")
+    ai_diag_p.add_argument(
+        "--problem-md", required=True, help="User problem Markdown file"
+    )
+    ai_diag_p.add_argument("--provider", required=True, help="AI provider name")
+    ai_diag_p.add_argument("--model", required=True, help="AI model identifier")
+    ai_diag_p.add_argument("--mib-json", help="Custom ME JSON definition")
+    ai_diag_p.add_argument(
+        "--semantic-dir", help="ME attributes semantic extension dir"
     )
 
     if rag_available:
@@ -476,6 +492,18 @@ def main() -> None:
             parser.error(str(exc))
         for model in models:
             print(model)
+    elif args.command == "ai" and args.ai_command == "diag":
+        if not args_load_json_semantic(args):
+            return
+        try:
+            diagnosis.run_diagnosis(
+                Path(args.pcap),
+                Path(args.problem_md),
+                args.provider,
+                args.model,
+            )
+        except (diagnosis.AIDiagnosisError, AIProviderError) as exc:
+            parser.error(str(exc))
     elif args.command == "ai" and args.ai_command == "rag" and args.rag_command == "init":
         try:
             workspace = initialize_workspace(Path(args.workdir), args.profile)

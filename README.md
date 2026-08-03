@@ -34,6 +34,7 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 | `overview` | Combine ONU capability, checks, MIB, VLAN, flow, and topology analysis | Markdown / JSON |
 | `ai providers` | List supported AI provider adapters | Text |
 | `ai models` | List models available from an AI provider | Text |
+| `ai diag` | Diagnose one OMCI capture with an AI provider | Streaming text |
 
 Optional feature: **AI/RAG**. See the [OMCIPcap AI/RAG User Guide](./docs/AI_README.md).
 
@@ -119,6 +120,21 @@ set `OLLAMA_BASE_URL` as an environment variable (there is no CLI option):
 ```bash
 export OLLAMA_BASE_URL=http://192.168.1.100:11434
 omcipcap ai models --provider ollama
+```
+
+### omcipcap ai diag
+
+Stream an AI-assisted diagnosis using a problem description and the generated
+OMCIPcap overview. See the [AI/RAG User Guide](./docs/AI_README.md) for provider
+configuration and system-prompt overrides.
+
+```bash
+omcipcap ai diag examples/omci.pcap \
+    --problem-md examples/ai/problem.md \
+    --provider openrouter \
+    --model anthropic/claude-opus-4.5 \
+    --mib-json custom-me.json \
+    --semantic-dir semantic/
 ```
 
 ### omcipcap check

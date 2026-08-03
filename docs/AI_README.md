@@ -1,5 +1,58 @@
 # OMCIPcap AI/RAG User Guide
 
+## AI Diagnosis
+
+`omcipcap ai diag` combines a user-written troubleshooting question with the
+standard OMCIPcap overview for one capture, then streams a diagnosis from the
+selected AI provider.
+
+### Provider setup
+
+Set the provider's API key through its environment variable. For example,
+OpenRouter uses `OPENROUTER_API_KEY`; API keys are not accepted as CLI options.
+Use `omcipcap ai providers` to list adapters and `omcipcap ai models --provider
+PROVIDER` to query available models. Ollama can run locally without an API key.
+
+### Problem description
+
+Write the reported symptom and questions in a UTF-8 Markdown file such as
+`examples/ai/problem.md`. OMCIPcap passes this content unchanged and appends the
+automatically generated overview Markdown as diagnosis evidence.
+
+### System prompt
+
+The command uses the built-in AI diagnosis system prompt by default. To replace
+it completely, set `AI_DIAG_SYSTEM_PROMPT` to a UTF-8 Markdown file:
+
+```bash
+export AI_DIAG_SYSTEM_PROMPT="${HOME}/my-system-prompt.md"
+```
+
+An invalid, unreadable, or empty custom prompt is reported as an error; the
+command does not fall back to the built-in prompt.
+
+### Example
+
+Configure the selected provider and run:
+
+```bash
+export OPENROUTER_API_KEY="your-api-key"
+omcipcap ai diag examples/omci.pcap \
+    --problem-md examples/ai/problem.md \
+    --provider openrouter \
+    --model anthropic/claude-opus-4.5 \
+    --mib-json custom-me.json \
+    --semantic-dir semantic/
+```
+
+The optional `--mib-json` and `--semantic-dir` inputs use the same custom
+Managed Entity definitions and semantic extensions as `omcipcap overview`.
+They are loaded before the diagnosis overview is generated.
+
+The provider receives the built-in or configured system prompt separately. Its
+user prompt contains the problem Markdown followed by the generated OMCIPcap
+overview. Output is streamed directly to stdout. Errors are written to stderr.
+
 OMCIPcap's RAG feature lets you build a local library of previously diagnosed
 OMCI issue cases and search it with natural-language questions.
 

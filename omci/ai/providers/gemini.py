@@ -39,7 +39,9 @@ class GeminiProvider(AIProvider):
                 payload = self._response_json(response)
             finally:
                 response.close()
-            if not isinstance(payload, dict) or not isinstance(payload.get("models"), list):
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("models"), list
+            ):
                 raise AIProviderResponseError("Gemini returned an invalid model list.")
             for item in payload["models"]:
                 if not isinstance(item, dict):
@@ -51,7 +53,9 @@ class GeminiProvider(AIProvider):
             if token is None:
                 break
             if not isinstance(token, str) or not token:
-                raise AIProviderResponseError("Gemini returned invalid pagination data.")
+                raise AIProviderResponseError(
+                    "Gemini returned invalid pagination data."
+                )
             params = {"pageSize": "1000", "pageToken": token}
         return self._normalize_models(identifiers)
 
@@ -70,14 +74,12 @@ class GeminiProvider(AIProvider):
             params={"alt": "sse"},
             json_body={
                 "system_instruction": {"parts": [{"text": system_prompt}]},
-                "contents": [
-                    {"role": "user", "parts": [{"text": user_prompt}]}
-                ],
+                "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
             },
             stream=True,
         )
         try:
-            for raw_line in response.iter_lines(decode_unicode=True):
+            for raw_line in response.iter_lines():
                 line = self._line_text(raw_line).strip()
                 if not line or line.startswith(":") or not line.startswith("data:"):
                     continue
