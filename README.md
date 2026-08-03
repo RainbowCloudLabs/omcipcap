@@ -113,7 +113,13 @@ omcipcap ai models --provider openai
 
 Supported providers are `openai`, `claude`, `gemini`, `openrouter`, and
 `ollama`. Ollama uses the local service at `http://localhost:11434` and does
-not require an API key by default.
+not require an API key by default. To use a remote or non-default Ollama server,
+set `OLLAMA_BASE_URL` as an environment variable (there is no CLI option):
+
+```bash
+export OLLAMA_BASE_URL=http://192.168.1.100:11434
+omcipcap ai models --provider ollama
+```
 
 ### omcipcap check
 Analyze a pcap file to display a summary of all OMCI packets:

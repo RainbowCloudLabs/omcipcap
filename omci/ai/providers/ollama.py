@@ -6,6 +6,7 @@
 # See LICENSE file in the project root for full license information.
 
 from collections.abc import Iterator
+import os
 
 import requests
 
@@ -16,10 +17,14 @@ from omci.ai.providers.errors import AIProviderRequestError, AIProviderResponseE
 class OllamaProvider(AIProvider):
     """Local Ollama REST API adapter."""
 
-    _BASE_URL = "http://localhost:11434/api"
+    _DEFAULT_BASE_URL = "http://localhost:11434"
+
+    @classmethod
+    def _base_url(cls) -> str:
+        return os.environ.get("OLLAMA_BASE_URL", cls._DEFAULT_BASE_URL).rstrip("/")
 
     def list_models(self) -> list[str]:
-        response = self._request("GET", f"{self._BASE_URL}/tags")
+        response = self._request("GET", f"{self._base_url()}/api/tags")
         try:
             payload = self._response_json(response)
         finally:
@@ -40,7 +45,7 @@ class OllamaProvider(AIProvider):
     ) -> Iterator[str]:
         response = self._request(
             "POST",
-            f"{self._BASE_URL}/chat",
+            f"{self._base_url()}/api/chat",
             json_body={
                 "model": model,
                 "messages": [

@@ -156,6 +156,50 @@ def test_model_list_is_normalized_and_response_is_closed(
 
 
 @pytest.mark.parametrize(
+    ("base_url", "expected_base_url"),
+    [
+        (None, "http://localhost:11434"),
+        ("http://192.168.1.100:11434", "http://192.168.1.100:11434"),
+        ("http://192.168.1.100:11434/", "http://192.168.1.100:11434"),
+    ],
+)
+def test_ollama_requests_use_configured_base_url(
+    base_url: str | None,
+    expected_base_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if base_url is None:
+        monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    else:
+        monkeypatch.setenv("OLLAMA_BASE_URL", base_url)
+
+    provider = OllamaProvider()
+    requested_urls: list[str] = []
+    responses = [
+        FakeResponse(payload={"models": []}),
+        FakeResponse(lines=['{"message":{"content":""},"done":true}']),
+    ]
+
+    def request(method: str, url: str, **kwargs: object) -> FakeResponse:
+        del method, kwargs
+        requested_urls.append(url)
+        return responses.pop(0)
+
+    monkeypatch.setattr(provider._session, "request", request)
+
+    assert provider.list_models() == []
+    assert list(
+        provider.stream_generate(
+            model="model", system_prompt="system", user_prompt="user"
+        )
+    ) == []
+    assert requested_urls == [
+        f"{expected_base_url}/api/tags",
+        f"{expected_base_url}/api/chat",
+    ]
+
+
+@pytest.mark.parametrize(
     ("provider", "lines", "expected"),
     [
         (
