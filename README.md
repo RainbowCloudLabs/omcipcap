@@ -32,6 +32,7 @@ The legacy **v0.2.x-lts** branch remains available for field engineers who prefe
 
 | Command | Description | Output Modes |
 |---|---|---|
+| `version` | Display OMCIPcap version and project information | Text / JSON |
 | `check` | Analyze RTT, TID duplicates, and ME failures | Table / JSON / Markdown |
 | `mibdb` | Dump the Semantic MIB Database | Table / JSON / Markdown |
 | `mibdb-diff (diff)` | Compare two MIBs with semantic decoding | Table / JSON / Markdown |
@@ -105,6 +106,17 @@ chmod +x omcipcap_linux
 ```
 
 ## Sub-Command
+### omcipcap version
+
+Display version and project information, or use `omcipcap --version` for the
+short form:
+
+```bash
+omcipcap version
+omcipcap version -j
+omcipcap --version
+```
+
 ### omcipcap check
 Analyze a pcap file to display a summary of all OMCI packets:
 ```

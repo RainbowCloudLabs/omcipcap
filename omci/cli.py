@@ -10,6 +10,10 @@ import argparse
 import json
 from pathlib import Path
 
+from omci import __version__
+from omci import __author__
+from omci import __email__
+from omci import __project__
 from omci import omcimib
 from omci import omcigrapher
 from omci import omciparser
@@ -52,6 +56,45 @@ else:
         SUPPORTED_PROFILES,
         WorkspaceInitError,
     )
+
+
+VERSION_INFO = {
+    "name": "omcipcap",
+    "version": __version__,
+    "author": __author__,
+    "email": __email__,
+    "project": __project__,
+}
+
+
+def format_short_version(version_info: dict[str, str]) -> str:
+    """Format the shared short version string."""
+    return f"{version_info['name']} v{version_info['version']}"
+
+
+def format_version_text(version_info: dict[str, str]) -> str:
+    """Format stable human-readable project and feedback information."""
+    return (
+        f"{format_short_version(version_info)}\n\n"
+        "Author\n"
+        f"  {version_info['author']}\n"
+        f"  {version_info['email']}\n\n"
+        "Project\n"
+        f"  {version_info['project']}\n\n"
+        "Feedback\n\n"
+        "  Bug reports and feature suggestions are always welcome.\n\n"
+        "  If possible, anonymized OMCI case studies are greatly appreciated.\n"
+        "  Please remove all customer-sensitive information before sharing.\n\n"
+        "Thank you for helping improve OMCIPcap!"
+    )
+
+
+def run_version(*, json_output: bool = False) -> None:
+    """Print OMCIPcap version information."""
+    if json_output:
+        print(json.dumps(VERSION_INFO, indent=2))
+    else:
+        print(format_version_text(VERSION_INFO))
 
 
 def _positive_int(value: str) -> int:
@@ -283,7 +326,13 @@ def args_load_json_semantic(args):
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="omcipcap", description="OMCI PCAP Diagnostic & Analysis Tool"
+        prog="omcipcap",
+        description=f"OMCI PCAP Diagnostic & Analysis Tool (v{__version__})",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=format_short_version(VERSION_INFO),
     )
 
     common_args = argparse.ArgumentParser(add_help=False)
@@ -299,6 +348,12 @@ def main() -> None:
         dest="command", help="Available analysis commands"
     )
 
+    # --- Sub-command: version ---
+    version_p = subparsers.add_parser("version", help="Show version information")
+    version_p.add_argument(
+        "-j", "--json-output", action="store_true", help="Output results in JSON format"
+    )
+
     # --- Sub-command: ai ---
     ai_help = (
         "AI-assisted analysis commands"
@@ -311,9 +366,7 @@ def main() -> None:
     ai_models_p = ai_subparsers.add_parser(
         "models", help="List available models for an AI provider"
     )
-    ai_models_p.add_argument(
-        "--provider", required=True, help="AI provider name"
-    )
+    ai_models_p.add_argument("--provider", required=True, help="AI provider name")
     ai_diag_p = ai_subparsers.add_parser(
         "diag", help="Diagnose one OMCI capture with an AI provider"
     )
@@ -337,9 +390,7 @@ def main() -> None:
     ai_diag_diff_p.add_argument(
         "--problem-md", required=True, help="User problem Markdown file"
     )
-    ai_diag_diff_p.add_argument(
-        "--provider", required=True, help="AI provider name"
-    )
+    ai_diag_diff_p.add_argument("--provider", required=True, help="AI provider name")
     ai_diag_diff_p.add_argument("--model", required=True, help="AI model identifier")
     ai_diag_diff_p.add_argument("--mib-json", help="Custom ME JSON definition")
     ai_diag_diff_p.add_argument(
@@ -375,9 +426,7 @@ def main() -> None:
         rag_query_p = rag_subparsers.add_parser(
             "query", help="Search indexed RAG issue cases"
         )
-        rag_query_p.add_argument(
-            "question", help="Natural-language search question"
-        )
+        rag_query_p.add_argument("question", help="Natural-language search question")
         rag_query_p.add_argument(
             "--top-k",
             type=_positive_int,
@@ -499,7 +548,9 @@ def main() -> None:
             print(f"[!] Error: PCAP file not found: {getattr(args, 'pcap', 'N/A')}")
             return
 
-    if args.command == "ai" and args.ai_command == "providers":
+    if args.command == "version":
+        run_version(json_output=args.json_output)
+    elif args.command == "ai" and args.ai_command == "providers":
         for provider_name in SUPPORTED_PROVIDERS:
             print(provider_name)
     elif args.command == "ai" and args.ai_command == "models":
@@ -535,7 +586,9 @@ def main() -> None:
             )
         except (diagnosis.AIDiagnosisError, AIProviderError) as exc:
             parser.error(str(exc))
-    elif args.command == "ai" and args.ai_command == "rag" and args.rag_command == "init":
+    elif (
+        args.command == "ai" and args.ai_command == "rag" and args.rag_command == "init"
+    ):
         try:
             workspace = initialize_workspace(Path(args.workdir), args.profile)
         except WorkspaceInitError as exc:

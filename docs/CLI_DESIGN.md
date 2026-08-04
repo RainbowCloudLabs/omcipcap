@@ -30,6 +30,7 @@ omcipcap
 │   ├── diag
 │   ├── diag-diff
 │   └── rag (when optional RAG dependencies are installed)
+├── version
 ├── check
 ├── mibdb
 ├── mibdb-diff
@@ -43,6 +44,9 @@ omcipcap
 
 Running the program without a recognized command prints root help. Unknown
 commands and invalid argument types are rejected by `argparse`.
+
+The root parser description includes the version from `omci.__version__`.
+`omcipcap --version` prints the short version and exits successfully.
 
 The `ai` parser is always registered for provider and diagnosis commands. Its
 `rag` child is registered only when the optional RAG dependencies are available.
@@ -168,6 +172,7 @@ output control.
 | `vlan-tbl` | Rich table | Yes | Yes | No |
 | `tcont-flow` | Rich tree | Yes | Yes | No |
 | `overview` | Markdown stdout | Yes | Yes, default | No |
+| `version` | Project information | Yes | No | No |
 
 The five `output_result()` users currently emit JSON with two-space indentation.
 Topology uses four-space indentation. JSON object keys that originate as
@@ -222,6 +227,13 @@ An invalid directory is reported and aborts command execution. Exceptions
 raised while importing an extension module are not caught by this loader.
 
 ## Command behavior
+
+### `version`
+
+`version` prints stable human-readable version, author, project, and feedback
+information. `-j`/`--json-output` emits the same project metadata as JSON.
+Both the subcommand and the root `--version` option read the package version
+from `omci.__version__`, which is also the version source used by packaging.
 
 ### `ai providers` / `ai models`
 
