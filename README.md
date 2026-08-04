@@ -45,8 +45,10 @@ The legacy **v0.2.x-lts** branch remains available for field engineers who prefe
 
 OMCIPcap also provides optional AI capabilities. See:
 
-- [AI Diagnosis User Guide](./docs/AI_DIAG_README.md)
-- [AI/RAG User Guide](./docs/AI_RAG_README.md)
+- [AI Diagnosis User Guide](./docs/user/AI_DIAG_README.md)
+- [AI/RAG User Guide](./docs/user/AI_RAG_README.md)
+
+See the [Documentation Index](./docs/README.md).
 
 ## Analysis Model
 
@@ -324,7 +326,7 @@ omcipcap overview sample.pcap -j | jq
 
 JSON output is suitable for programs, CI/CD pipelines, and automation.
 `overview` always writes to stdout and does not create an output file
-automatically. See the [CLI design guide](./docs/CLI_DESIGN.md) for details.
+automatically. See the [CLI design guide](./docs/spec/CLI_DESIGN.md) for details.
 
 ## Disclaimer
 this software is for educational and network debugging purposes only. The author (daneshih1125) provides this software "as is" without warranty of any kind. 

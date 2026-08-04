@@ -9,7 +9,7 @@ topology, and produce a combined Markdown or JSON overview.
 
 This document describes the implemented CLI in `omci.cli` and the non-AI
 modules it calls. It also records the root registration of implemented AI
-provider commands. Provider internals are defined in `docs/AI_PROVIDER.md`;
+provider commands. Provider internals are defined in `AI_PROVIDER.md`;
 diagnosis and RAG behavior are outside this document.
 
 The installed executable is declared in `pyproject.toml`:

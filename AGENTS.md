@@ -35,7 +35,7 @@ the implementation and tests are complete.
 - `tests/`: unit and subprocess-level CLI coverage.
 - `examples/` and `extensions/`: sample captures, custom ME definitions,
   semantic extensions, images, and generated examples.
-- `docs/`: design documentation. Read `docs/CLI_DESIGN.md` before changing CLI
+- `docs/spec/`: design documentation. Read `docs/spec/CLI_DESIGN.md` before changing CLI
   behavior.
 
 Keep the main data flow intact:
@@ -68,8 +68,8 @@ design document under `docs/`.
 
 Examples include:
 
-- `docs/CLI_DESIGN.md`
-- `docs/RAG_DESIGN.md`
+- `docs/spec/CLI_DESIGN.md`
+- `docs/spec/RAG_DESIGN.md`
 
 If the requested implementation conflicts with the approved design:
 
@@ -120,7 +120,7 @@ as the target behavior for implementation.
 - Clearly label and separate planned behavior from implemented behavior until
   the implementation and tests are complete.
 - Update `README.md` for user-facing installation, command, or option changes.
-- Update `docs/CLI_DESIGN.md` for CLI architecture, output-mode, extension, or
+- Update `docs/spec/CLI_DESIGN.md` for CLI architecture, output-mode, extension, or
   execution-flow changes.
 - Keep examples short and executable. Do not present planned commands,
   configuration systems, or formats as already implemented.
