@@ -32,12 +32,13 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 | `tcont-flow` | Trace T-CONT → GEM → PQ traffic hierarchy | Table / JSON / Markdown |
 | `topology (graphic)` | Generate interactive topology HTML | Interactive HTML / JSON / Markdown |
 | `overview` | Combine ONU capability, checks, MIB, VLAN, flow, and topology analysis | Markdown / JSON |
-| `ai providers` | List supported AI provider adapters | Text |
-| `ai models` | List models available from an AI provider | Text |
-| `ai diag` | Diagnose one OMCI capture with an AI provider | Streaming text |
-| `ai diag-diff` | Compare Target and Golden captures with an AI provider | Streaming text |
 
-Optional feature: **AI/RAG**. See the [OMCIPcap AI/RAG User Guide](./docs/AI_README.md).
+## Optional AI Features
+
+OMCIPcap also provides optional AI capabilities. See:
+
+- [AI Diagnosis User Guide](./docs/AI_DIAG_README.md)
+- [AI/RAG User Guide](./docs/AI_RAG_README.md)
 
 ## Analysis Model
 
@@ -97,60 +98,6 @@ chmod +x omcipcap_linux
 ```
 
 ## Sub-Command
-### omcipcap ai providers / models
-
-List the supported provider adapters without credentials or a network request:
-
-```bash
-omcipcap ai providers
-```
-
-List the models reported by one provider. Cloud providers read their API keys
-from the environment; API keys are not accepted as command-line arguments.
-
-```bash
-export OPENAI_API_KEY="your-api-key"
-omcipcap ai models --provider openai
-```
-
-Supported providers are `openai`, `claude`, `gemini`, `openrouter`, and
-`ollama`. Ollama uses the local service at `http://localhost:11434` and does
-not require an API key by default. To use a remote or non-default Ollama server,
-set `OLLAMA_BASE_URL` as an environment variable (there is no CLI option):
-
-```bash
-export OLLAMA_BASE_URL=http://192.168.1.100:11434
-omcipcap ai models --provider ollama
-```
-
-### omcipcap ai diag
-
-Stream an AI-assisted diagnosis using a problem description and the generated
-OMCIPcap overview. See the [AI/RAG User Guide](./docs/AI_README.md) for provider
-configuration and system-prompt overrides.
-
-```bash
-omcipcap ai diag examples/omci.pcap \
-    --problem-md examples/ai/problem.md \
-    --provider openrouter \
-    --model anthropic/claude-opus-4.5 \
-    --mib-json custom-me.json \
-    --semantic-dir semantic/
-```
-
-### omcipcap ai diag-diff
-
-Compare a Target capture with known-good Golden provisioning. The AI receives a
-full-lifecycle semantic MIB diff followed by the Golden and Target overviews.
-
-```bash
-omcipcap ai diag-diff target.pcap \
-    --golden-pcap golden.pcap \
-    --problem-md examples/ai/problem.md \
-    --provider openrouter \
-    --model anthropic/claude-opus-4.5
-```
-
 ### omcipcap check
 Analyze a pcap file to display a summary of all OMCI packets:
 ```
