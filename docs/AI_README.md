@@ -53,6 +53,27 @@ The provider receives the built-in or configured system prompt separately. Its
 user prompt contains the problem Markdown followed by the generated OMCIPcap
 overview. Output is streamed directly to stdout. Errors are written to stderr.
 
+### Compare with a Golden capture
+
+`ai diag-diff` compares the complete observed MIB lifecycle of a Target capture
+against a known-good Golden capture, then includes the Golden and Target
+overviews as additional evidence:
+
+```bash
+omcipcap ai diag-diff target.pcap \
+    --golden-pcap golden.pcap \
+    --problem-md examples/ai/problem.md \
+    --provider openrouter \
+    --model anthropic/claude-opus-4.5 \
+    --mib-json custom-me.json \
+    --semantic-dir semantic/
+```
+
+The diff direction is Target to Golden: old and removed values describe the
+Target, while new and added values describe the Golden capture. The command
+uses the same system-prompt override, semantic inputs, and streaming behavior
+as `ai diag`.
+
 OMCIPcap's RAG feature lets you build a local library of previously diagnosed
 OMCI issue cases and search it with natural-language questions.
 

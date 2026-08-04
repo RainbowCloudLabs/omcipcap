@@ -1,6 +1,6 @@
 # OMCIPcap AI Diagnosis CLI Specification
 
-**Status:** Implemented (`diag`); Draft (`diag-diff`)
+**Status:** Implemented
 **Version:** 2
 
 ---

@@ -10,8 +10,9 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from omci import omcimd, overview
+from omci import omcimd, omciparser, overview
 from omci.ai.providers import create_provider
+from omci.omci import load_omci_packets
 
 
 DEFAULT_SYSTEM_PROMPT = """You are a senior Broadband Access Network engineer.
@@ -178,21 +179,58 @@ def compose_user_prompt(problem_prompt: str, overview_markdown: str) -> str:
     )
 
 
-def run_diagnosis(
-    pcap_path: Path,
-    problem_path: Path,
+def generate_full_lifecycle_diff_markdown(
+    target_pcap_path: Path,
+    golden_pcap_path: Path,
+) -> str:
+    """Generate a Target-to-Golden semantic diff from full observed MIB state."""
+    target_packets = load_omci_packets(str(target_pcap_path), include_raw=False)
+    golden_packets = load_omci_packets(str(golden_pcap_path), include_raw=False)
+    target_full_mib = omciparser.get_all_mib_db(target_packets)
+    golden_full_mib = omciparser.get_all_mib_db(golden_packets)
+    diff_data = omciparser.get_mib_diff_data(target_full_mib, golden_full_mib)
+    return omcimd.render_diff_md(diff_data)
+
+
+def compose_diff_user_prompt(
+    problem_prompt: str,
+    diff_markdown: str,
+    golden_overview_markdown: str,
+    target_overview_markdown: str,
+) -> str:
+    """Compose deterministic Target-to-Golden diagnosis context."""
+    return (
+        "User-Reported Problem\n"
+        "=====================\n\n"
+        f"{problem_prompt.rstrip()}\n\n"
+        "---\n\n"
+        "Full Lifecycle Semantic MIB Diff\n"
+        "================================\n\n"
+        "Comparison direction: Target PCAP → Golden PCAP.\n\n"
+        "- `old` values represent the Target PCAP\n"
+        "- `new` values represent the Golden PCAP\n"
+        "- `added` entries exist only in the Golden PCAP\n"
+        "- `removed` entries exist only in the Target PCAP\n"
+        "- `modified` entries exist in both captures but differ\n\n"
+        f"{diff_markdown.rstrip()}\n\n"
+        "---\n\n"
+        "OMCIPcap Analysis of the Golden PCAP\n"
+        "====================================\n\n"
+        f"{golden_overview_markdown.rstrip()}\n\n"
+        "---\n\n"
+        "OMCIPcap Analysis of the Target PCAP\n"
+        "====================================\n\n"
+        f"{target_overview_markdown.rstrip()}\n"
+    )
+
+
+def _stream_diagnosis(
     provider_name: str,
     model: str,
-    output: TextIO | None = None,
+    system_prompt: str,
+    user_prompt: str,
+    output: TextIO | None,
 ) -> None:
-    """Generate and stream one AI-assisted PCAP diagnosis."""
-    if not pcap_path.is_file():
-        raise AIDiagnosisError(f"PCAP file not found: {pcap_path}")
-
-    system_prompt = load_system_prompt()
-    problem_prompt = load_problem_prompt(problem_path)
-    overview_markdown = generate_overview_markdown(pcap_path)
-    user_prompt = compose_user_prompt(problem_prompt, overview_markdown)
     provider = create_provider(provider_name)
     stream = output if output is not None else sys.stdout
 
@@ -208,3 +246,52 @@ def run_diagnosis(
         stream.flush()
     except KeyboardInterrupt as exc:
         raise AIDiagnosisError("AI diagnosis streaming interrupted.") from exc
+
+
+def run_diagnosis(
+    pcap_path: Path,
+    problem_path: Path,
+    provider_name: str,
+    model: str,
+    output: TextIO | None = None,
+) -> None:
+    """Generate and stream one AI-assisted PCAP diagnosis."""
+    if not pcap_path.is_file():
+        raise AIDiagnosisError(f"PCAP file not found: {pcap_path}")
+
+    system_prompt = load_system_prompt()
+    problem_prompt = load_problem_prompt(problem_path)
+    overview_markdown = generate_overview_markdown(pcap_path)
+    user_prompt = compose_user_prompt(problem_prompt, overview_markdown)
+    _stream_diagnosis(provider_name, model, system_prompt, user_prompt, output)
+
+
+def run_diagnosis_diff(
+    target_pcap_path: Path,
+    golden_pcap_path: Path,
+    problem_path: Path,
+    provider_name: str,
+    model: str,
+    output: TextIO | None = None,
+) -> None:
+    """Generate and stream a Target-to-Golden AI-assisted diagnosis."""
+    if not target_pcap_path.is_file():
+        raise AIDiagnosisError(f"Target PCAP file not found: {target_pcap_path}")
+    if not golden_pcap_path.is_file():
+        raise AIDiagnosisError(f"Golden PCAP file not found: {golden_pcap_path}")
+
+    system_prompt = load_system_prompt()
+    problem_prompt = load_problem_prompt(problem_path)
+    diff_markdown = generate_full_lifecycle_diff_markdown(
+        target_pcap_path,
+        golden_pcap_path,
+    )
+    golden_overview_markdown = generate_overview_markdown(golden_pcap_path)
+    target_overview_markdown = generate_overview_markdown(target_pcap_path)
+    user_prompt = compose_diff_user_prompt(
+        problem_prompt,
+        diff_markdown,
+        golden_overview_markdown,
+        target_overview_markdown,
+    )
+    _stream_diagnosis(provider_name, model, system_prompt, user_prompt, output)

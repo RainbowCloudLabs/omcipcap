@@ -35,6 +35,7 @@ The **Master** branch represents the latest evolution, shifting from a standalon
 | `ai providers` | List supported AI provider adapters | Text |
 | `ai models` | List models available from an AI provider | Text |
 | `ai diag` | Diagnose one OMCI capture with an AI provider | Streaming text |
+| `ai diag-diff` | Compare Target and Golden captures with an AI provider | Streaming text |
 
 Optional feature: **AI/RAG**. See the [OMCIPcap AI/RAG User Guide](./docs/AI_README.md).
 
@@ -135,6 +136,19 @@ omcipcap ai diag examples/omci.pcap \
     --model anthropic/claude-opus-4.5 \
     --mib-json custom-me.json \
     --semantic-dir semantic/
+```
+
+### omcipcap ai diag-diff
+
+Compare a Target capture with known-good Golden provisioning. The AI receives a
+full-lifecycle semantic MIB diff followed by the Golden and Target overviews.
+
+```bash
+omcipcap ai diag-diff target.pcap \
+    --golden-pcap golden.pcap \
+    --problem-md examples/ai/problem.md \
+    --provider openrouter \
+    --model anthropic/claude-opus-4.5
 ```
 
 ### omcipcap check

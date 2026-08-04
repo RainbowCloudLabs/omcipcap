@@ -28,6 +28,7 @@ omcipcap
 │   ├── providers
 │   ├── models
 │   ├── diag
+│   ├── diag-diff
 │   └── rag (when optional RAG dependencies are installed)
 ├── check
 ├── mibdb
@@ -187,7 +188,8 @@ semantic directory.
 
 ### `--mib-json`
 
-Supported by `mibdb`, `mibdb-diff`/`diff`, and `overview`.
+Supported by `mibdb`, `mibdb-diff`/`diff`, `overview`, `ai diag`, and
+`ai diag-diff`.
 
 The JSON file must contain a mapping from class ID to an ME specification.
 `load_mib_json()` converts each key with `int()` and replaces or adds the entry
@@ -201,7 +203,7 @@ the remainder of the process. It is not a global CLI option and is not used by
 
 ### `--semantic-dir`
 
-Supported by the same three commands.
+Supported by the same commands.
 
 `omci.omcisemantic.load_external_semantics()` appends the directory to
 `sys.path`, imports every non-`__*.py` file in the directory, and relies on
@@ -232,7 +234,7 @@ configuration, authentication, HTTP communication, response normalization, and
 shared exceptions remain inside `omci.ai.providers`. Normal provider failures
 are reported as `argparse` errors without a traceback.
 
-### `ai diag`
+### `ai diag` / `ai diag-diff`
 
 `ai diag PCAP --problem-md FILE --provider PROVIDER --model MODEL` generates the
 standard overview Markdown for one capture and combines it with the unchanged
@@ -245,6 +247,14 @@ an immediate flush. Input, provider, and streaming failures are reported as
 `--mib-json PATH` and `--semantic-dir DIR` use the same command-specific loading
 path as `overview`. MIB definitions are loaded first, followed by semantic
 extensions, before overview generation or provider creation.
+
+`ai diag-diff TARGET --golden-pcap GOLDEN --problem-md FILE --provider
+PROVIDER --model MODEL` reconstructs the full observed MIB lifecycle for both
+captures and applies the existing semantic diff pipeline in the Target-to-Golden
+direction. Its provider user prompt contains the unchanged problem Markdown,
+the rendered semantic diff with explicit direction semantics, the Golden
+overview, and the Target overview, in that order. Both overviews use the same
+generator and renderer as `overview`. Output and errors follow `ai diag`.
 
 ### `check`
 

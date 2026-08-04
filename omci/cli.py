@@ -327,6 +327,24 @@ def main() -> None:
     ai_diag_p.add_argument(
         "--semantic-dir", help="ME attributes semantic extension dir"
     )
+    ai_diag_diff_p = ai_subparsers.add_parser(
+        "diag-diff", help="Compare Target and Golden captures with an AI provider"
+    )
+    ai_diag_diff_p.add_argument("pcap", help="Path to Target pcap file")
+    ai_diag_diff_p.add_argument(
+        "--golden-pcap", required=True, help="Path to Golden pcap file"
+    )
+    ai_diag_diff_p.add_argument(
+        "--problem-md", required=True, help="User problem Markdown file"
+    )
+    ai_diag_diff_p.add_argument(
+        "--provider", required=True, help="AI provider name"
+    )
+    ai_diag_diff_p.add_argument("--model", required=True, help="AI model identifier")
+    ai_diag_diff_p.add_argument("--mib-json", help="Custom ME JSON definition")
+    ai_diag_diff_p.add_argument(
+        "--semantic-dir", help="ME attributes semantic extension dir"
+    )
 
     if rag_available:
         # --- Sub-command: ai rag ---
@@ -498,6 +516,19 @@ def main() -> None:
         try:
             diagnosis.run_diagnosis(
                 Path(args.pcap),
+                Path(args.problem_md),
+                args.provider,
+                args.model,
+            )
+        except (diagnosis.AIDiagnosisError, AIProviderError) as exc:
+            parser.error(str(exc))
+    elif args.command == "ai" and args.ai_command == "diag-diff":
+        if not args_load_json_semantic(args):
+            return
+        try:
+            diagnosis.run_diagnosis_diff(
+                Path(args.pcap),
+                Path(args.golden_pcap),
                 Path(args.problem_md),
                 args.provider,
                 args.model,
