@@ -7,11 +7,18 @@
 
 `omcipcap` is a professional GPON/XGS-PON OMCI Semantic Analysis Framework for ITU-T G.988 protocols. By implementing a table-driven semantic engine, it transforms raw pcap data into structured, human-readable insights—covering MIB state auditing, VLAN logic decoding, and T-CONT traffic hierarchy tracing.
 
-## 🌟 Master Branch: AI & Automation Ready
-The **Master** branch represents the latest evolution, shifting from a standalone tool to an analysis framework:
-- **For AI & Programmers**: Full support for **JSON IR** (`-j / --json-output`), making it easy to pipe MIB data into AI models or automation pipelines.
-- **For Field Engineers**: The legacy **v0.2.x-lts** branch remains available for on-site troubleshooting with traditional CLI outputs.
-- **Dual-Mode Output**: Every command supports **Rich Print** (for human diagnosis) and **JSON** (for machine processing).
+
+## 🌟 Master Branch: AI-Native OMCI Analysis Framework
+
+The **Master** branch represents the latest evolution of OMCIPcap, transforming it from a standalone protocol parser into an **AI-native OMCI analysis framework**.
+
+- **AI Diagnosis** — Analyze single captures or compare Target vs. Golden captures using cloud or local LLMs.
+- **Automation Ready** — All analysis commands support structured **JSON IR** (`-j / --json-output`) for scripting, AI workflows, and CI/CD integration.
+- **Semantic Analysis** — Full OMCI semantic decoding, lifecycle MIB reconstruction, VLAN analysis, traffic hierarchy, and topology visualization.
+- **Multiple Output Formats** — Commands support **Rich Print**, **Markdown**, and **JSON** outputs for engineers, documentation, AI, and automation.
+- **Optional Local RAG** — Build a private OMCI troubleshooting knowledge base using your own issue cases.
+
+The legacy **v0.2.x-lts** branch remains available for field engineers who prefer the traditional CLI workflow.
 
 ## Why Use omcipcap?
 
