@@ -132,22 +132,22 @@ def output_result(
 
 
 def run_mibdb(
-    pcap_path,
-    only_upload=False,
-    only_vendor=False,
-    class_id_str=None,
-    json_output=False,
-    md_output=False,
-):
+    pcap_path: Path | str,
+    only_upload: bool = False,
+    only_vendor: bool = False,
+    class_id_str: str | None = None,
+    json_output: bool = False,
+    md_output: bool = False,
+) -> None:
     class_ids = None
-    if class_id_str:
+    if class_id_str is not None:
         try:
             class_ids = [int(c.strip()) for c in class_id_str.split(",")]
         except ValueError:
             print(
                 "[!] Error: Class ID must be numbers separated by commas (e.g. 84,171)"
             )
-            return
+            raise SystemExit(1)
 
     omci_pkts = load_omci_packets(pcap_path, include_raw=False)
     mib_data = omciparser.get_mib_db_data(
@@ -186,13 +186,13 @@ def run_omcicheck(
 
 
 def run_omcidiff(
-    pcap1,
-    pcap2,
-    full_diff=False,
-    class_id_str=None,
-    json_output=False,
-    md_output=False,
-):
+    pcap1: Path | str,
+    pcap2: Path | str,
+    full_diff: bool = False,
+    class_id_str: str | None = None,
+    json_output: bool = False,
+    md_output: bool = False,
+) -> None:
     class_ids = None
     omci_pkts1 = load_omci_packets(pcap1, include_raw=False)
     omci_pkts2 = load_omci_packets(pcap2, include_raw=False)
@@ -204,14 +204,14 @@ def run_omcidiff(
         mib1 = omciparser.get_mib_snapshot(omci_pkts1)
         mib2 = omciparser.get_mib_snapshot(omci_pkts2)
 
-    if class_id_str:
+    if class_id_str is not None:
         try:
             class_ids = [int(c.strip()) for c in class_id_str.split(",")]
         except ValueError:
             print(
                 "[!] Error: Class ID must be numbers separated by commas (e.g. 84,171)"
             )
-            return
+            raise SystemExit(1)
 
     filter_set = set(class_ids) if class_ids else None
     if filter_set:
@@ -314,11 +314,11 @@ def load_mib_json(json_path):
         return False
 
 
-def args_load_json_semantic(args):
-    if getattr(args, "mib_json", None):
+def args_load_json_semantic(args: argparse.Namespace) -> bool:
+    if getattr(args, "mib_json", None) is not None:
         if not load_mib_json(args.mib_json):
             return False
-    if getattr(args, "semantic_dir", None):
+    if getattr(args, "semantic_dir", None) is not None:
         if not omcisemantic.load_external_semantics(args.semantic_dir):
             return False
     return True
@@ -546,7 +546,7 @@ def main() -> None:
     if args.command in commands_need_pcap:
         if not hasattr(args, "pcap") or not args.pcap or not os.path.exists(args.pcap):
             print(f"[!] Error: PCAP file not found: {getattr(args, 'pcap', 'N/A')}")
-            return
+            raise SystemExit(1)
 
     if args.command == "version":
         run_version(json_output=args.json_output)
@@ -563,7 +563,7 @@ def main() -> None:
             print(model)
     elif args.command == "ai" and args.ai_command == "diag":
         if not args_load_json_semantic(args):
-            return
+            raise SystemExit(1)
         try:
             diagnosis.run_diagnosis(
                 Path(args.pcap),
@@ -575,7 +575,7 @@ def main() -> None:
             parser.error(str(exc))
     elif args.command == "ai" and args.ai_command == "diag-diff":
         if not args_load_json_semantic(args):
-            return
+            raise SystemExit(1)
         try:
             diagnosis.run_diagnosis_diff(
                 Path(args.pcap),
@@ -609,6 +609,8 @@ def main() -> None:
             parser.error(str(exc))
         if ingested:
             print(f'[+] RAG case ingested: "{args.case_id}"')
+        else:
+            raise SystemExit(1)
     elif (
         args.command == "ai"
         and args.ai_command == "rag"
@@ -678,7 +680,7 @@ def main() -> None:
         )
     elif args.command == "mibdb":
         if not args_load_json_semantic(args):
-            return
+            raise SystemExit(1)
         run_mibdb(
             args.pcap,
             args.only_upload,
@@ -690,12 +692,12 @@ def main() -> None:
     elif args.command in ["mibdb-diff", "diff"]:
         if not os.path.exists(args.pcap1):
             print(f"[!] Error: PCAP file not found: {args.pcap1}")
-            return
+            raise SystemExit(1)
         if not os.path.exists(args.pcap2):
             print(f"[!] Error: PCAP file not found: {args.pcap2}")
-            return
+            raise SystemExit(1)
         if not args_load_json_semantic(args):
-            return
+            raise SystemExit(1)
         run_omcidiff(
             args.pcap1,
             args.pcap2,
@@ -726,10 +728,11 @@ def main() -> None:
         )
     elif args.command == "overview":
         if not args_load_json_semantic(args):
-            return
+            raise SystemExit(1)
         run_overview(args.pcap, json_output=args.json_output, md_output=args.md)
     else:
         parser.print_help()
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

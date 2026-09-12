@@ -5,7 +5,11 @@
 # Licensed under the MIT License.
 # See LICENSE file in the project root for full license information.
 
+from collections.abc import Iterator
+from pathlib import Path
+
 from scapy.all import rdpcap
+from scapy.packet import Packet
 from enum import IntEnum
 
 
@@ -248,7 +252,9 @@ class OMCIExtended(OMCIPacket):
         self.content = raw_data[10 : 10 + self.length]
 
 
-def omci_packets_from_pcap(pcap_path, include_raw=False):
+def omci_packets_from_pcap(
+    pcap_path: Path | str, include_raw: bool = False
+) -> Iterator[tuple[int, OMCIBaseline, Packet | None]]:
     """
     Generator: yields OMCI packets from PCAP file.
 
@@ -265,7 +271,7 @@ def omci_packets_from_pcap(pcap_path, include_raw=False):
         raw_pkts = rdpcap(pcap_path)
     except Exception as e:
         print(f"Error reading pcap: {e}")
-        return
+        raise
 
     for i, raw_pkt in enumerate(raw_pkts):
         if not raw_pkt.haslayer("Ether") or raw_pkt.getlayer("Ether").type != 0x88B5:

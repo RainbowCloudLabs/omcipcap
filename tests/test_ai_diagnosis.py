@@ -453,7 +453,9 @@ def test_ai_diag_semantic_loading_failure_prevents_provider_invocation(
         ],
     )
 
-    cli.main()
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main()
+    assert exc_info.value.code == 1
 
     captured = capsys.readouterr()
     assert "Error loading semantic directory" in captured.out
@@ -816,6 +818,8 @@ def test_ai_diag_diff_semantic_failure_prevents_diagnosis(
         ],
     )
 
-    cli.main()
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main()
+    assert exc_info.value.code == 1
 
     assert "Error loading semantic directory" in capsys.readouterr().out
