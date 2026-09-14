@@ -412,7 +412,7 @@ Validation is divided between `argparse`, `main()`, and loaders:
 - `main()` checks one-PCAP command paths before dispatch. Diff paths are checked
   separately because they use `pcap1` and `pcap2`.
 - `mibdb` and diff parse `--class-id` inside their handlers. A non-decimal item
-  prints an example and returns.
+  prints an example and exits with status `1`.
 - A missing MIB JSON path returns failure without a message from
   `load_mib_json()`; malformed content or update errors print MIB load errors.
 - A missing semantic directory prints an error and aborts dispatch.
@@ -421,11 +421,22 @@ Validation is divided between `argparse`, `main()`, and loaders:
 - Renderer absence would raise `ValueError`, although every current caller of
   `output_result()` supplies its required renderers.
 
-Most manual validation failures print to stdout and return from `main()` rather
-than raising `SystemExit` with a nonzero status. Consequently, callers cannot
-rely on a failing process status for every invalid path, extension, class list,
-or unreadable capture. Conversely, uncaught exceptions from semantic modules,
-renderers, file writes, or analysis code propagate normally.
+OMCIPcap explicitly defines the following exit statuses:
+
+- `0`: The selected subcommand completed successfully.
+- `1`: OMCIPcap explicitly detected and handled a command/input failure,
+  including missing capture paths, invalid class lists, rejected MIB JSON or
+  semantic directory inputs, and missing subcommands.
+
+Python `argparse` handles argument parsing and usage errors, such as an omitted
+required capture argument, and normally exits with status `2`. This is inherited
+`argparse` behavior, not an OMCIPcap-defined exit status. Handled AI/provider/RAG
+errors reported through `parser.error()` also follow this library behavior.
+
+Manual validation messages generally remain on stdout; a nonzero exit status
+does not imply a message on stderr. Uncaught exceptions from semantic modules,
+renderers, file writes, or analysis code propagate normally and are not
+normalized by a universal CLI exception handler.
 
 ## Current inconsistencies and exceptions
 
@@ -439,8 +450,9 @@ These are descriptions of implemented behavior, not recommendations:
   topology; overview also writes indented JSON.
 - `--tpid-dei` affects only Rich VLAN presentation.
 - PCAP existence checks and diff path checks use separate dispatch branches.
-- Some invalid inputs produce messages and a successful process exit; other
-  failures are argparse errors or uncaught exceptions.
+- Explicit manual validation failures exit with status `1`; errors reported
+  through `argparse` follow its inherited exit behavior, normally status `2`.
+  Unexpected exceptions may still propagate uncaught.
 - PCAP read failure and “valid capture with no supported OMCI frames” both
   generally reach analysis as an empty packet list.
 - Extension loading mutates module-level registries and does not restore their
