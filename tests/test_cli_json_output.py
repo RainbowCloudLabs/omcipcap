@@ -8,6 +8,10 @@ import subprocess
 import pytest
 import json
 import os
+from pathlib import Path
+from runpy import run_path
+
+from omci.omcimib import ME_SPEC, OMCIClass, get_me_name
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -446,6 +450,82 @@ def test_cmd_mibdb_diff_json_output():
         c for c in changes if c["class_id"] == 5 and c["inst_id"] == 258
     )
     assert cardholder_rem["status"] == "removed"
+
+
+@pytest.mark.parametrize("command", ["mibdb-diff", "diff"])
+@pytest.mark.parametrize(
+    ("class_id", "attribute"),
+    [
+        (OMCIClass.ONT_G, "Logical password"),
+        (OMCIClass.AUTHENTICATION_SECURITY_METHOD, "Password"),
+        (OMCIClass.AUTHENTICATION_SECURITY_METHOD, "Username 1"),
+    ],
+)
+def test_cmd_mibdb_diff_masks_sensitive_values_json(
+    tmp_path: Path, command: str, class_id: OMCIClass, attribute: str
+) -> None:
+    # utils is a repository helper directory, not an installed Python package.
+    helpers = run_path(str(Path(__file__).resolve().parents[1] / "utils" / "gen_utils.py"))
+    generate_mib_pkts = helpers["generate_mib_pkts"]
+    generate_pcap_from_pkts = helpers["generate_pcap_from_pkts"]
+    attribute_index, attribute_spec = next(
+        (index, spec)
+        for index, spec in enumerate(ME_SPEC[class_id][1])
+        if spec[0] == attribute
+    )
+    mask = 0x8000 >> attribute_index
+    attribute_length = attribute_spec[1]
+    before = tmp_path / "password_before.pcap"
+    after = tmp_path / "password_after.pcap"
+    secrets = ("old-secret", "new-secret")
+
+    for path, secret, sync in [(before, secrets[0], 1), (after, secrets[1], 2)]:
+        packets, _ = generate_mib_pkts(
+            [
+                (class_id, 0, mask, secret.encode("ascii").ljust(attribute_length, b"\x00")),
+                (OMCIClass.ONT_DATA, 0, 0x8000, bytes([sync])),
+            ]
+        )
+        generate_pcap_from_pkts(str(path), packets)
+
+    result = subprocess.run(
+        ["omcipcap", command, "-j", str(before), str(after)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stderr == ""
+    for secret in secrets:
+        assert secret not in result.stdout
+    assert json.loads(result.stdout) == {
+        "changes": [
+            {
+                "status": "modified",
+                "me_name": get_me_name(OMCIClass.ONT_DATA),
+                "attr_name": "MIB Data Sync",
+                "class_id": int(OMCIClass.ONT_DATA),
+                "inst_id": 0,
+                "old": "0x1",
+                "new": "0x2",
+            },
+            {
+                "status": "modified",
+                "me_name": get_me_name(class_id),
+                "attr_name": attribute,
+                "class_id": int(class_id),
+                "inst_id": 0,
+                "old": "*****",
+                "new": "*****",
+            },
+        ],
+        "unknown_me_mask_mismatch": [],
+        "summary": {
+            "modified_count": 2,
+            "removed_count": 0,
+            "added_count": 0,
+            "unknown_me_mask_mismatch_count": 0,
+        },
+    }
 
 
 def test_cmd_mibdb_diff_vendor_specific_json():

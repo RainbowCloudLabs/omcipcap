@@ -498,6 +498,11 @@ def get_mib_diff_data(mib1, mib2):
                 if val1 != val2:
                     v1_str = obj1.attr_semantic(attr)
                     v2_str = obj2.attr_semantic(attr)
+                    is_sensitive_attr = any(
+                        k in attr.lower() for k in SENSITIVE_ME_ATTRIBUTES
+                    )
+                    if class_id in SENSITIVE_ME_CLASSES or is_sensitive_attr:
+                        v1_str = v2_str = "*****"
                     diff_data["changes"].append(
                         {
                             "status": "modified",
