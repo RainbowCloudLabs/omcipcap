@@ -14,8 +14,8 @@ pip install "omcipcap[rag]"
 This installs the additional embedding-model and vector-database packages used
 by the RAG commands.
 
-> **Note:** Standalone OMCIPcap binary releases do not include AI functionality.
-> The AI subsystem depends on optional Python packages, so use the Python
+> **Note:** Standalone OMCIPcap binary releases do not include any AI RAG functionality.
+> The RAG subsystem depends on optional Python packages, so use the Python
 > package installation above when you need RAG support.
 
 After installation, the available commands are under:
@@ -433,9 +433,12 @@ cd examples/issues
 
 The script will:
 
-1. Remove any previous demo workspace.
-2. Create a new RAG workspace.
-3. Ingest all example issue cases.
+1. Remove `~/.local/omcipcap/`, including the existing active-workspace
+   configuration in `rag_config.json` and any other files in that directory.
+2. Remove any previous demo workspace at `~/RAG_TEST`.
+3. Create a new RAG workspace at `~/RAG_TEST` and make it active after successful
+   initialization, recreating `~/.local/omcipcap/rag_config.json`.
+4. Ingest all example issue cases.
 
 After initialization, you can immediately experiment with commands such as:
 

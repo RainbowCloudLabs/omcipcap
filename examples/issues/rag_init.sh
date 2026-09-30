@@ -1,7 +1,7 @@
 #!/bin/sh
-[ -d ${HOME}/.local/omcipcap ] && rm -rf ${HOME}/.local/omcipcap
-[ -d ${HOME}/RAG_TEST ] && rm -rf ${HOME}/RAG_TEST
-omcipcap ai rag init --profile workstation --dir ${HOME}/RAG_TEST 2>/dev/null
+[ -d "${HOME}/.local/omcipcap" ] && rm -rf "${HOME}/.local/omcipcap"
+[ -d "${HOME}/RAG_TEST" ] && rm -rf "${HOME}/RAG_TEST"
+omcipcap ai rag init --profile workstation --dir "${HOME}/RAG_TEST" 2>/dev/null
 
 omcipcap ai rag ingest --issue-md case_01_olt_disply_confi_fail.md \
   --case-id case01 \
