@@ -6,20 +6,26 @@
 
 import json
 from omci import omcisemantic
+from omci.omcimib import SENSITIVE_ME_CLASSES, SENSITIVE_ME_ATTRIBUTES
 
 
-def generate_tooltip(cid, iid, attrs):
+def generate_tooltip(cid: int, iid: int, attrs: dict[str, object]) -> str:
     if not attrs:
         return f"ME {cid} ({iid})"
 
     lines = []
 
     for k, v in attrs.items():
-        val_str = str(v)
-        if cid == 47 and k == "TP type" and isinstance(v, int):
+        if cid in SENSITIVE_ME_CLASSES or any(
+            keyword in k.lower() for keyword in SENSITIVE_ME_ATTRIBUTES
+        ):
+            val_str = "*****"
+        elif cid == 47 and k == "TP type" and isinstance(v, int):
             val_str = omcisemantic.get_attr_semantic(47, "TP type", v)
         elif cid == 171 and k == "Association type" and isinstance(v, int):
             val_str = omcisemantic.get_attr_semantic(171, "Association type", v)
+        else:
+            val_str = str(v)
 
         lines.append(f"{k}: {val_str}\n")
     return "".join(lines)
