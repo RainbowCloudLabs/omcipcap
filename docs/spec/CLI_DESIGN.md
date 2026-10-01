@@ -8,7 +8,8 @@ compare MIB state, derive VLAN and T-CONT/GEM relationships, render logical
 topology, and produce a combined Markdown or JSON overview.
 
 This document describes the implemented CLI in `omci.cli` and the non-AI
-modules it calls. It also records the root registration of implemented AI
+modules it calls. Sections explicitly marked as planned define target behavior
+that is not yet implemented. It also records the root registration of implemented AI
 provider commands. Provider internals are defined in `AI_PROVIDER.md`;
 diagnosis and RAG behavior are outside this document.
 
@@ -225,6 +226,80 @@ precedence.
 
 An invalid directory is reported and aborts command execution. Exceptions
 raised while importing an extension module are not caught by this loader.
+
+## Sensitive-data masking environment overrides
+
+The implementation uses the `SENSITIVE_ME_CLASSES` and
+`SENSITIVE_ME_ATTRIBUTES` sets in `omci.omcimib`, resolving environment overrides
+with `configure_sensitive_masking()` before analysis in the CLI.
+
+Users can replace either masking set through environment variables,
+without adding CLI arguments or a configuration file:
+
+| Environment variable | Replacement value |
+| --- | --- |
+| `OMCIPCAP_SENSITIVE_ME_CLASSES` | Comma-separated decimal OMCI class IDs, each in the range `0` through `65535` |
+| `OMCIPCAP_SENSITIVE_ME_ATTRIBUTES` | Comma-separated attribute-name fragments, matched case-insensitively |
+
+Each variable is independent:
+
+- When absent, use the corresponding built-in set.
+- When present and nonempty, replace the corresponding set completely; do not
+  append to the built-in entries.
+- When empty or containing only whitespace, use an empty set, disabling that
+  category of masking.
+
+Trim surrounding whitespace from each entry, normalize attribute fragments to
+lowercase, and collapse duplicate entries. Empty entries within a nonempty
+comma-separated list are invalid. Class IDs must use decimal digits; reject
+hexadecimal notation, negative values, nonnumeric entries, and out-of-range IDs.
+
+An attribute is masked as `*****` when its class is in the effective class set
+**or** its name contains any fragment in the effective attribute set. Clearing
+one set does not disable masking provided by the other. To disable both
+categories, users must explicitly clear both variables.
+
+Resolve and validate the environment settings before capture loading or
+analysis for commands that use these masking rules. Invalid settings must
+produce a clear error on stderr identifying the variable and invalid entry,
+and terminate with a nonzero exit status. Do not silently fall back to defaults
+or partially apply an invalid list. Resolve settings for each command invocation
+so repeated calls in one Python process do not retain a previous invocation's
+overrides; preserve the built-in defaults separately from the effective sets.
+
+The effective sets apply consistently to existing masking paths: MIB extraction
+(`val` and `text`), semantic diff values (`old` and `new`), and topology HTML
+tooltips. Commands that reuse these paths, including overview and AI reports,
+inherit the same settings. Aliases use identical settings. Output schemas,
+diff detection and counts, and semantic decoding of unmasked values remain
+unchanged. This feature does not add masking to topology JSON attributes or
+unknown-ME raw payloads, and does not change topology class selection.
+
+Usage with replacement lists:
+
+```bash
+export OMCIPCAP_SENSITIVE_ME_CLASSES="148,153"
+export OMCIPCAP_SENSITIVE_ME_ATTRIBUTES="password,secret"
+omcipcap mibdb capture.pcap
+```
+
+Usage to disable both masking categories and expose original values:
+
+```bash
+export OMCIPCAP_SENSITIVE_ME_CLASSES=""
+export OMCIPCAP_SENSITIVE_ME_ATTRIBUTES=""
+omcipcap mibdb capture.pcap
+```
+
+Use `unset` on either variable to restore its built-in defaults. These settings
+are documented in `README.md`. `tests/test_sensitive_env.py` covers absent,
+replacement, empty, whitespace, malformed, and repeated-invocation settings,
+both masking categories together, MIB Rich/JSON/Markdown, diff output and
+aliases, overview reuse, and generated HTML tooltips. Invalid settings use
+`parser.error()` and exit with status `2` before capture loading. Both lists are
+validated before either effective set is updated. The sets are updated in place
+so parser and grapher imports share the same effective rules, while immutable
+copies retain the built-in defaults.
 
 ## Command behavior
 

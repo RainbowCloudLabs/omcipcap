@@ -534,6 +534,20 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    uses_masking = args.command in (
+        "mibdb", "mibdb-diff", "diff", "topology", "graphic", "overview"
+    ) or (
+        args.command == "ai" and (
+            args.ai_command in ("diag", "diag-diff")
+            or (args.ai_command == "rag" and getattr(args, "rag_command", None) == "ingest")
+        )
+    )
+    if uses_masking:
+        try:
+            omcimib.configure_sensitive_masking()
+        except ValueError as exc:
+            parser.error(str(exc))
+
     commands_need_pcap = [
         "check",
         "mibdb",

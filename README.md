@@ -166,6 +166,41 @@ An ME is unknown when its class has no built-in or loaded custom definition. Wit
 
 Currently, `mibdb` output (Table / JSON / Markdown) and the MIB data in `overview.json` expose only the last retained record for each unknown ME instance. These outputs therefore do not show its complete raw record history. To decode attributes, provide the ME definition with `--mib-json`; see **Advanced: Custom ME JSON Format** below.
 
+#### Sensitive Data Masking
+
+By default, sensitive ME classes and attributes whose names contain `password`
+or `secret` (case-insensitively) are masked as `*****`. You can replace these
+rules through environment variables without adding CLI options:
+
+```bash
+export OMCIPCAP_SENSITIVE_ME_CLASSES="148,153"
+export OMCIPCAP_SENSITIVE_ME_ATTRIBUTES="password,secret"
+omcipcap mibdb input.pcap
+```
+
+Each variable replaces its corresponding list. Class IDs are comma-separated
+decimal numbers from `0` to `65535`; attribute entries are comma-separated,
+case-insensitive name fragments. Surrounding whitespace is ignored. Invalid
+lists cause an error before capture analysis.
+
+An unset variable uses the built-in defaults. An empty value clears its list.
+A matching class **or** attribute fragment still masks the value; to expose
+original values, clear both lists:
+
+```bash
+export OMCIPCAP_SENSITIVE_ME_CLASSES=""
+export OMCIPCAP_SENSITIVE_ME_ATTRIBUTES=""
+omcipcap mibdb input.pcap
+```
+
+These settings apply to MIB output, diff values, reports that reuse them, and
+topology HTML tooltips. They do not change unknown-ME raw payloads or topology
+JSON attributes. Use `unset` to restore defaults:
+
+```bash
+unset OMCIPCAP_SENSITIVE_ME_CLASSES OMCIPCAP_SENSITIVE_ME_ATTRIBUTES
+```
+
 #### Semantic Extensions with --semantic-dir
 
 Customize attribute decoding with specific semantics

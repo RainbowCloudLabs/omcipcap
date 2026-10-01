@@ -5,6 +5,7 @@
 # Licensed under the MIT License.
 
 import struct
+import os
 from enum import IntEnum
 from omci.omcisemantic import OMCISemantic
 
@@ -1777,6 +1778,44 @@ SENSITIVE_ME_CLASSES = {
 }
 
 SENSITIVE_ME_ATTRIBUTES = {"password", "secret"}
+
+_DEFAULT_SENSITIVE_ME_CLASSES = frozenset(SENSITIVE_ME_CLASSES)
+_DEFAULT_SENSITIVE_ME_ATTRIBUTES = frozenset(SENSITIVE_ME_ATTRIBUTES)
+
+
+def configure_sensitive_masking() -> None:
+    """Resolve environment overrides atomically, preserving imported set references."""
+    classes = set(_DEFAULT_SENSITIVE_ME_CLASSES)
+    attributes = set(_DEFAULT_SENSITIVE_ME_ATTRIBUTES)
+    for variable in (
+        "OMCIPCAP_SENSITIVE_ME_CLASSES", "OMCIPCAP_SENSITIVE_ME_ATTRIBUTES"
+    ):
+        value = os.environ.get(variable)
+        if value is None:
+            continue
+        entries = [entry.strip() for entry in value.split(",")] if value.strip() else []
+        if variable == "OMCIPCAP_SENSITIVE_ME_CLASSES":
+            classes = set()
+            for entry in entries:
+                decimal = entry.lstrip("0") or "0"
+                if (
+                    not entry
+                    or not entry.isascii()
+                    or not entry.isdecimal()
+                    or len(decimal) > 5
+                    or int(decimal) > 65535
+                ):
+                    raise ValueError(f"{variable}: invalid entry {entry!r}; expected decimal class ID 0..65535")
+                classes.add(int(decimal))
+        else:
+            if "" in entries:
+                raise ValueError(f"{variable}: invalid entry ''; expected attribute-name fragment")
+            attributes = {entry.lower() for entry in entries}
+
+    SENSITIVE_ME_CLASSES.clear()
+    SENSITIVE_ME_CLASSES.update(classes)
+    SENSITIVE_ME_ATTRIBUTES.clear()
+    SENSITIVE_ME_ATTRIBUTES.update(attributes)
 
 
 def get_me_name(class_id):
