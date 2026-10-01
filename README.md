@@ -160,6 +160,12 @@ omcipcap mibdb --class-id 84,171 examples/omci.pcap
 omcipcap mibdb -j --only-upload examples/omci.pcap
 ```
 
+#### Unknown ME Data
+
+An ME is unknown when its class has no built-in or loaded custom definition. Without an attribute schema, the reconstruction retains each observed record's attribute mask and raw hexadecimal payload, including repeated masks, instead of merging them into decoded attributes. This is intentional: the tool cannot reliably interpret how those payloads update the ME.
+
+Currently, `mibdb` output (Table / JSON / Markdown) and the MIB data in `overview.json` expose only the last retained record for each unknown ME instance. These outputs therefore do not show its complete raw record history. To decode attributes, provide the ME definition with `--mib-json`; see **Advanced: Custom ME JSON Format** below.
+
 #### Semantic Extensions with --semantic-dir
 
 Customize attribute decoding with specific semantics
