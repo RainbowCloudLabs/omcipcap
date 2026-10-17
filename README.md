@@ -367,7 +367,7 @@ omcipcap overview sample.pcap -j | jq
 
 JSON output is suitable for programs, CI/CD pipelines, and automation.
 `overview` always writes to stdout and does not create an output file
-automatically. See the [CLI design guide](./docs/spec/CLI_DESIGN.md) for details.
+automatically. See the [CLI design guide](./docs/design/CLI_DESIGN.md) for details.
 
 ## Disclaimer
 this software is for educational and network debugging purposes only. The author (daneshih1125) provides this software "as is" without warranty of any kind. 

@@ -209,7 +209,7 @@ The RAG implementation MUST NOT duplicate the existing:
 - vendor-specific MIB identification logic
 
 Detailed discovery rules and command behavior are defined in `RAG_CLI.md`.
-Global command architecture and CLI conventions are defined in `CLI_DESIGN.md`.
+Global command architecture and CLI conventions are defined in `../CLI_DESIGN.md`.
 
 ### Default Workspace Configuration
 

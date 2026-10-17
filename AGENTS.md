@@ -14,29 +14,21 @@ referenced approved design document is the target behavior; do not silently
 change it merely to match existing code. Clearly label planned behavior until
 the implementation and tests are complete.
 
-## Project architecture
+## Project structure
 
-- `omci/cli.py`: `argparse` command definitions, validation, extension loading,
-  orchestration, and output-mode dispatch.
-- `omci/omci.py`: OMCI packet models and PCAP loading. The current loader
-  selects EtherType `0x88B5` and yields successfully parsed baseline frames.
-- `omci/omcimib.py`: managed-entity identifiers, built-in `ME_SPEC`, MIB
-  instances, attribute decoding, and semantic lookup.
-- `omci/omcisemantic.py`: built-in semantic translators and dynamic translator
-  registration.
-- `omci/omciparser.py`: reconstruction of upload snapshots and full MIB state,
-  plus renderer-neutral check, diff, topology, VLAN, and flow results.
-- `omci/omcivlan.py`, `omci/omciflow.py`: focused VLAN and T-CONT/GEM/PQ domain
-  logic.
-- `omci/omcirich.py`, `omci/omcimd.py`, `omci/omcigrapher.py`: Rich,
-  Markdown, and topology HTML presentation.
-- `omci/overview.py`: aggregation of existing analyses into `overview.json`.
-- `utils/`: deterministic PCAP generators used by tests.
-- `tests/`: unit and subprocess-level CLI coverage.
-- `examples/` and `extensions/`: sample captures, custom ME definitions,
-  semantic extensions, images, and generated examples.
-- `docs/spec/`: design documentation. Read `docs/spec/CLI_DESIGN.md` before changing CLI
-  behavior.
+- `omci/`: Python application package.
+- `utils/`: deterministic capture generators and supporting utilities.
+- `tests/`: unit and subprocess-level CLI tests.
+- `examples/`: sample captures, images, and generated examples.
+- `extensions/`: sample custom ME definitions and semantic extensions.
+- `docs/user/`: user-facing documentation.
+- `docs/design/`: shared architecture and CLI design. Read
+  `docs/design/CLI_DESIGN.md` before changing CLI behavior.
+- `docs/design/spec/`: feature specifications and algorithms.
+- `docs/design/code_guide/`: optional feature-specific implementation guidance,
+  when present.
+
+Refer to `docs/design/ARCHITECTURE.md` for current module responsibilities and feature-to-module mapping.
 
 Keep the main data flow intact:
 
@@ -68,8 +60,18 @@ design document under `docs/`.
 
 Examples include:
 
-- `docs/spec/CLI_DESIGN.md`
-- `docs/spec/RAG_DESIGN.md`
+- `docs/design/CLI_DESIGN.md`
+- `docs/design/spec/RAG_DESIGN.md`
+
+Development reading order:
+
+1. Read `docs/design/ARCHITECTURE.md` when architectural context is needed.
+2. Read the relevant feature specifications under `docs/design/spec/`.
+3. Read the corresponding implementation guide under `docs/design/code_guide/`,
+   if present.
+4. Inspect the actual source code before implementation.
+5. Report specification or implementation conflicts before making unapproved
+   design changes.
 
 If the requested implementation conflicts with the approved design:
 
@@ -120,7 +122,7 @@ as the target behavior for implementation.
 - Clearly label and separate planned behavior from implemented behavior until
   the implementation and tests are complete.
 - Update `README.md` for user-facing installation, command, or option changes.
-- Update `docs/spec/CLI_DESIGN.md` for CLI architecture, output-mode, extension, or
+- Update `docs/design/CLI_DESIGN.md` for CLI architecture, output-mode, extension, or
   execution-flow changes.
 - Keep examples short and executable. Do not present planned commands,
   configuration systems, or formats as already implemented.
