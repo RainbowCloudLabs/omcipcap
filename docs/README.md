@@ -9,6 +9,7 @@
 
 - [Current Architecture](./design/ARCHITECTURE.md)
 - [CLI Design](./design/CLI_DESIGN.md)
+- [MIBDB Puzzle Candidate Algorithm (Planned)](./design/spec/MIBDB-PUZZLE-ALG.md)
 - [AI Provider Framework](./design/spec/AI_PROVIDER.md)
 - [AI Diagnosis CLI](./design/spec/AI_DIAG_CLI.md)
 - [AI Diagnosis System Prompt](./design/spec/AI_DIAG_SYSTEM_PROMPT.md)

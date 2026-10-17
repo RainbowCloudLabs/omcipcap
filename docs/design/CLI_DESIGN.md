@@ -34,6 +34,8 @@ omcipcap
 ├── version
 ├── check
 ├── mibdb
+├── mibdb-puzzle (planned)
+│   └── alias: puzzle
 ├── mibdb-diff
 │   └── alias: diff
 ├── topology
@@ -55,6 +57,9 @@ The `ai` parser is always registered for provider and diagnosis commands. Its
 Aliases are parser aliases, not separate implementations. `argparse` preserves
 the spelling used by the caller in `args.command`, so dispatch explicitly
 accepts both `mibdb-diff` and `diff`, and both `topology` and `graphic`.
+
+The planned `mibdb-puzzle` and `puzzle` names must also share a single
+parser/handler, not two implementations.
 
 ## Shared command-line arguments
 
@@ -168,6 +173,7 @@ output control.
 | --- | --- | --- | --- | --- |
 | `check` | Rich table | Yes | Yes | No |
 | `mibdb` | Rich table | Yes | Yes | No |
+| `mibdb-puzzle`, `puzzle` (planned) | Interactive wizard (TTY) | No | No | Candidate JSON schema export |
 | `mibdb-diff`, `diff` | Rich table | Yes | Yes | No |
 | `topology`, `graphic` | HTML file | Yes | Yes | Yes, default |
 | `vlan-tbl` | Rich table | Yes | Yes | No |
@@ -382,6 +388,147 @@ Example:
 ```text
 omcipcap mibdb -j --only-upload --class-id 84,171 capture.pcap
 ```
+
+### `mibdb-puzzle` / `puzzle` (planned)
+
+**Status: Planned — design only; not yet implemented.** `mibdb-puzzle` is the primary
+command, and `puzzle` is an `argparse` alias of the *same* command/handler,
+following the established `mibdb-diff`/`diff` convention. Candidate generation, constraint solving, filtering, deduplication, ordering,
+and consistency classification **MUST follow** `docs/design/spec/MIBDB-PUZZLE-ALG.md`.
+Usage examples belong in `docs/user/MIBDB-PUZZLE-README.md`.
+
+The command reconstructs candidate attribute boundaries for unknown OMCI ME
+classes using packet evidence and deterministic constraint solving. v1 supports
+only the Interactive Wizard. The positional `pcap` argument is the only input;
+Unknown ME selection takes place inside the Wizard.
+
+```bash
+omcipcap mibdb-puzzle examples/omci.pcap
+omcipcap puzzle examples/omci.pcap
+```
+
+#### Options
+
+| Option | Behavior |
+| --- | --- |
+| `pcap` | Required capture path |
+
+
+#### Interactive wizard (TTY)
+
+The `mibdb-puzzle <pcap>` invocation requires standard input to be a TTY. The
+wizard follows the explicit sequence below; prompts must not advance on invalid
+input. All identifiers displayed in a menu are **selection numbers**, not ME
+class IDs or attribute indexes.
+
+| Step | Prompt / display | User action | Next step |
+| --- | --- | --- | --- |
+| 1. Discover | List all unknown ME class IDs in the capture; show each class's observed instance count, packet count, and distinct masks | Select an ME by menu number | 2 |
+| 2. Analyze | Show selected class, evidence summary, constraint coverage, and candidate layouts within internally defined display limits | Select a candidate by number | 3 |
+| 3. Preview | Display ordered attribute indexes, sizes, unresolved positions, supporting observations, and export limitations | Confirm candidate, choose another candidate, or return to the ME menu | 4 or 2 or 1 |
+| 4. Export | Show proposed `<class-id>-<candidate-id>.json` path | Accept path, enter another path, or cancel | 5 on successful export |
+| 5. Re-decode | Show `omcipcap mibdb <pcap> --mib-json <path>` | Answer `[Y/n]` to invoke existing `mibdb` and display its results | 6 |
+| 6. Result | Report export status and separately summarize candidate consistency; do not label decoding success as schema confirmation | Exit or return to ME selection to analyze another unknown class | End or 1 |
+
+Example terminal session (illustrative data; **not** a predicted result):
+
+```text
+$ omcipcap puzzle examples/omci.pcap
+
+Unknown ME classes:
+  #   Class ID   Instances   Packets   Masks
+  1   65530      3           28        4
+  2   65535      1           12        2
+
+Select unknown ME [1-2] (q=quit): 1
+
+Class ID 65530 — candidate layouts
+  #   Attribute lengths          Evidence
+  1   attr1=2B, attr2=4B         consistent
+  2   attr1=4B, attr2=2B         consistent
+
+Select candidate [1-2] (b=back, q=quit): 1
+
+Candidate #1 preview
+  attr1: unknown_attr_1 (2 bytes, opaque)
+  attr2: unknown_attr_2 (4 bytes, opaque)
+  Validation: consistent with evaluated packet constraints
+  Exportable: yes (all required positions resolved)
+
+Export this candidate? [Y/n/b]: y
+Output file [65530-1.json]:
+Exported: 65530-1.json
+
+Re-decode using existing mibdb? [Y/n]: y
+  omcipcap mibdb examples/omci.pcap --mib-json 65530-1.json
+  ... existing mibdb output ...
+
+Consistency: consistent (not independently confirmed)
+Analyze another unknown ME? [y/N]: n
+```
+
+**Wizard behavior and edge cases:**
+
+- Discovery includes **all** unknown ME classes, not just vendor-reserved IDs.
+  Unknown means no available built-in or loaded custom schema. Sort classes
+  by numeric class ID for reproducibility. If there is exactly one class,
+  display it and skip the class-selection prompt; if none, print a clear message
+  and exit successfully.
+- Candidate numbers are stable within an analysis result. Display limits and
+  solver search limits are internally defined according to the algorithm
+  specification; display limits do not change candidate IDs or solver results.
+  Do not renumber candidates after pagination or interactive navigation.
+  If there is no valid candidate, report why and do not offer export.
+- Invalid menu input must show the allowed range and re-prompt. `b` returns
+  to the preceding applicable selection screen; `q`, Ctrl-C, or EOF cancels
+  gracefully without a partial JSON export.
+- Preview must warn if required attribute positions are unresolved or SBC
+  assumptions lack evidence. Such a candidate is **not exportable** if the
+  existing positional `--mib-json` schema would misalign mask bits. The wizard
+  may display it, but must not offer a misleading exported file.
+- Default output is `<class-id>-<candidate-id>.json`; never silently overwrite
+  an existing file. Ask for a new path or explicit overwrite confirmation.
+  Use an atomic file write, so interruption cannot leave truncated JSON.
+- Re-decode uses the existing `mibdb` command/handler and its established
+  presentation (no new parser). Declining re-decode still leaves the exported
+  JSON on disk. If re-decode fails, preserve the JSON, display the error,
+  and report validation separately.
+- If standard input is not a TTY, display a clear error that Puzzle requires
+  an interactive terminal and exit with a nonzero status. Do not wait for input
+  or fall back to non-interactive execution.
+
+Candidate generation, evidence eligibility, constraint solving, candidate ordering and IDs, ambiguity reporting, and cross-packet consistency checks MUST follow `docs/design/spec/MIBDB-PUZZLE-ALG.md`.
+
+The CLI Wizard is responsible only for interaction and presentation. It MUST NOT define an independent candidate-generation or scoring algorithm.
+
+The existing `--mib-json` ME tuple schema is **positional**. If unobserved
+attribute lengths prevent correct mask-bit alignment, the command must not
+silently export a misleading schema. Attribute type and SBC assumptions must
+be disclosed. Schema export should retain evidence/provenance separately if
+the current loader cannot accept metadata.
+
+After candidate selection/export, the wizard may display and invoke the
+**existing** command rather than implementing a second decoder:
+
+```bash
+omcipcap mibdb examples/omci.pcap --mib-json 65530-1.json
+```
+
+A successful `mibdb` decode only shows that the selected definition can be
+consumed. The solver must separately report whether all usable packet
+constraints remain **consistent**; it must not call a candidate **confirmed**
+without independent evidence. With no unknown ME, report an empty discovery
+result and exit successfully in the Interactive Wizard. Non-TTY invocation
+is rejected as described above.
+
+The wizard presents candidates in the terminal and prompts for the output
+filename when exporting the selected ME schema JSON. Unlike report-oriented
+commands, `mibdb-puzzle` does not expose `-j`, `--json-output`, or `--md` in the proposed MVP. Any later
+structured candidate-report format should be specified separately from the
+`--mib-json`-compatible schema export.
+
+This section records the proposed CLI surface; its arguments, status codes,
+and output schema require source-level review before implementation.
 
 ### `mibdb-diff` / `diff`
 
